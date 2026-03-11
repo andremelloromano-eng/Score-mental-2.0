@@ -471,7 +471,7 @@ export default function HomePage() {
     }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando polling robusto a cada 1.5s para paymentId:", pid);
+    console.log("🔍 Iniciando polling AGRESSIVO a cada 1s para paymentId:", pid);
     pollingRef.current = setInterval(async () => {
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
@@ -488,15 +488,15 @@ export default function HomePage() {
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
-          // Redirecionamento forçado - prioridade máxima
-          window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
+          // Redirecionamento garantido para mobile
+          window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
           return; // Garante que nada mais execute
         }
       } catch (err) {
         console.error("🔍 Erro no polling:", err);
         return;
       }
-    }, 1500);
+    }, 1000); // POLLING AGRESSIVO: 1 segundo
 
     return () => {
       if (pollingRef.current) {
@@ -519,35 +519,50 @@ export default function HomePage() {
   useEffect(() => {
     if (!paymentId || checkoutAprovado) return;
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && paymentId) {
-        console.log("📱 Usuário voltou ao app - verificação imediata de status");
-        try {
-          const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
-          const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
-          console.log("📱 Status verificado ao voltar:", { paymentId, status: statusData?.status });
-          
-          if (statusData?.status === "approved") {
-            console.log("✅ Pagamento aprovado ao voltar! Redirecionando...");
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current);
-              pollingRef.current = null;
-            }
-            setCheckoutAprovado(true);
-            setCheckoutOpen(false);
-            setPaymentId(null);
-            setErroEnvio(null);
-            setPixAberto(false);
-            window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
+    // VERIFICAÇÃO IMEDIATA quando usuário volta para o navegador
+    const handleFocus = async () => {
+      if (!paymentId) return;
+      
+      console.log("📱 FOCO detectado - verificação IMEDIATA de status");
+      try {
+        const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
+        const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
+        console.log("📱 Status no foco:", { paymentId, status: statusData?.status });
+        
+        if (statusData?.status === "approved") {
+          console.log("✅ Pagamento aprovado no foco! Redirecionando...");
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
           }
-        } catch (err) {
-          console.error("📱 Erro na verificação ao voltar:", err);
+          setCheckoutAprovado(true);
+          setCheckoutOpen(false);
+          setPaymentId(null);
+          setErroEnvio(null);
+          setPixAberto(false);
+          window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
         }
+      } catch (err) {
+        console.error("📱 Erro na verificação no foco:", err);
       }
     };
 
+    // VERIFICAÇÃO quando página fica visível (complementar)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && paymentId) {
+        console.log("📱 Página visível - verificação imediata");
+        await handleFocus();
+      }
+    };
+
+    // Adicionar ambos os listeners para máxima cobertura
+    window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [paymentId, checkoutAprovado, email]);
 
   // Função de verificação manual (botão)
@@ -571,7 +586,7 @@ export default function HomePage() {
         setPaymentId(null);
         setErroEnvio(null);
         setPixAberto(false);
-        window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
+        window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
       } else {
         // Feedback visual de que ainda não foi aprovado
         console.log("⏳ Ainda não aprovado na verificação manual");
