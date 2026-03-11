@@ -224,6 +224,22 @@ export default function HomePage() {
   const successSoundPlayedRef = useRef(false);
   const soundsUnlockedRef = useRef(false);
 
+  // Detecção de mobile
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detectar se é mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                            window.innerWidth < 768;
+      setIsMobile(isMobileDevice);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // use-sound — experiência imersiva e moderna; volumes 0.05/0.08 para elegância.
   const [playHapticTap, { stop: stopHapticTap }] = useSound("/sounds/haptic-tap.wav", { volume: 0.05 });
   const [playSuccess] = useSound("/sounds/success.wav", { volume: 0.5 });
@@ -437,11 +453,18 @@ export default function HomePage() {
 
       if (data.url) {
         console.log("🔗 URL de pagamento gerada:", data.url);
-        // FLUXO DE ABA EXTERNA: abre em nova aba no mesmo evento do clique
-        setPagamentoUrl(data.url);
-        setPixAberto(true);
-        // Abrir imediatamente no mesmo evento para não ser bloqueado
-        window.open(data.url, '_blank');
+        
+        if (isMobile) {
+          // FLUXO MOBILE: abre em nova aba e mostra tela de aguardando
+          setPagamentoUrl(data.url);
+          setPixAberto(true);
+          // Abrir imediatamente no mesmo evento para não ser bloqueado
+          window.open(data.url, '_blank');
+        } else {
+          // FLUXO DESKTOP: redireciona na mesma janela (funcionava antes)
+          window.location.href = data.url;
+          setPixAberto(true);
+        }
       }
 
       if (!pid) {
@@ -467,7 +490,11 @@ export default function HomePage() {
     };
   }, []);
 
+  // POLLING E MONITORAMENTO: Apenas para mobile ou quando o modal está aberto
   useEffect(() => {
+    // Desktop não usa polling (redireciona direto)
+    if (!isMobile && !checkoutOpen) return;
+    
     if (!checkoutOpen || !paymentId || checkoutAprovado) return;
 
     if (pollingRef.current) {
@@ -476,31 +503,33 @@ export default function HomePage() {
     }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando monitoramento a cada 2s para paymentId:", pid);
+    console.log("🔍 Iniciando monitoramento para paymentId:", pid, { isMobile });
     pollingRef.current = setInterval(async () => {
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
         const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
         console.log("🔍 Status polling:", { pid, status: statusData?.status });
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado! Exibindo sucesso");
+          console.log("✅ Pagamento aprovado! Limpando estado e mostrando sucesso");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
+          // Limpar estado completamente
           setCheckoutAprovado(true);
           setCheckoutOpen(false);
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
-          // Não redireciona, apenas exibe sucesso na página
+          setPagamentoUrl(null);
+          setTempoExpiracao(600); // Reset timer
           return;
         }
       } catch (err) {
         console.error("🔍 Erro no polling:", err);
         return;
       }
-    }, 2000); // POLLING DE MONITORAMENTO: 2 segundos
+    }, isMobile ? 2000 : 1500); // Mobile: 2s, Desktop: 1.5s (se precisar)
 
     return () => {
       if (pollingRef.current) {
@@ -509,7 +538,7 @@ export default function HomePage() {
         console.log("🔍 Polling limpo");
       }
     };
-  }, [checkoutOpen, paymentId, checkoutAprovado, email]);
+  }, [checkoutOpen, paymentId, checkoutAprovado, email, isMobile]);
 
   useEffect(() => {
     if (!checkoutOpen && pollingRef.current) {
@@ -519,8 +548,11 @@ export default function HomePage() {
     }
   }, [checkoutOpen]);
 
-  // CRONÔMETRO DE EXPIRAÇÃO: Contagem regressiva de 10 minutos
+  // CRONÔMETRO DE EXPIRAÇÃO: Apenas para mobile
   useEffect(() => {
+    // Desktop não usa cronômetro
+    if (!isMobile) return;
+    
     if (!pixAberto || checkoutAprovado) return;
 
     const intervalo = setInterval(() => {
@@ -537,7 +569,7 @@ export default function HomePage() {
     }, 1000);
 
     return () => clearInterval(intervalo);
-  }, [pixAberto, checkoutAprovado]);
+  }, [pixAberto, checkoutAprovado, isMobile]);
 
   // Formatar tempo para MM:SS
   const formatarTempo = (segundos: number) => {
@@ -546,8 +578,11 @@ export default function HomePage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // MONITORAMENTO EM SEGUNDO PLANO: Verifica quando usuário volta da aba do Mercado Pago
+  // MONITORAMENTO EM SEGUNDO PLANO: Apenas para mobile - verifica quando usuário volta da aba
   useEffect(() => {
+    // Desktop não usa monitoramento de focus
+    if (!isMobile) return;
+    
     if (!paymentId || checkoutAprovado) return;
 
     // VERIFICAÇÃO IMEDIATA quando usuário volta para nossa aba
@@ -561,16 +596,19 @@ export default function HomePage() {
         console.log("📱 Status ao voltar:", { paymentId, status: statusData?.status });
         
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado ao voltar! Exibindo sucesso");
+          console.log("✅ Pagamento aprovado ao voltar! Limpando estado");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
+          // Limpar estado completamente
           setCheckoutAprovado(true);
           setCheckoutOpen(false);
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
+          setPagamentoUrl(null);
+          setTempoExpiracao(600); // Reset timer
         }
       } catch (err) {
         console.error("📱 Erro na verificação ao voltar:", err);
@@ -583,7 +621,7 @@ export default function HomePage() {
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [paymentId, checkoutAprovado]);
+  }, [paymentId, checkoutAprovado, isMobile]);
 
   // Função de verificação manual (botão)
   const handleManualCheck = async () => {
@@ -986,24 +1024,18 @@ export default function HomePage() {
                   </div>
 
                   {checkoutAprovado && (
-                    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-6 text-center">
-                      <div className="text-3xl mb-3">🎉</div>
-                      <div className="text-lg font-bold text-emerald-100 mb-2">
-                        Sucesso!
+                    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-center">
+                      <div className="text-2xl mb-2">✅</div>
+                      <div className="text-sm font-semibold text-emerald-100 mb-2">
+                        Pagamento Confirmado!
                       </div>
-                      <div className="text-xs text-emerald-200 mb-4">
-                        Pagamento confirmado! Seu certificado de 12 páginas foi enviado para o e-mail: {email}
+                      <div className="text-xs text-emerald-200">
+                        Seu certificado foi enviado para: {email}
                       </div>
-                      <button
-                        onClick={() => window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`}
-                        className="w-full button-emerald justify-center text-sm font-medium"
-                      >
-                        📥 Baixar meu Certificado
-                      </button>
                     </div>
                   )}
 
-                  {pixAberto && !checkoutAprovado && (
+                  {pixAberto && !checkoutAprovado && isMobile && (
                     <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-3 py-2.5 text-xs text-blue-100">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin"></div>
@@ -1089,8 +1121,8 @@ export default function HomePage() {
                       {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                     </button>
 
-                    {/* BOTÃO DE VERIFICAÇÃO MANUAL - PLANO B MOBILE */}
-                    {pixAberto && paymentId && !checkoutAprovado && (
+                    {/* BOTÃO DE VERIFICAÇÃO MANUAL - Apenas mobile */}
+                    {pixAberto && paymentId && !checkoutAprovado && isMobile && (
                       <button
                         type="button"
                         onClick={handleManualCheck}
