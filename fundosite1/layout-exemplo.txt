@@ -1,0 +1,21 @@
+Como usar no layout (Next.js App Router):
+
+1. Coloca ParticlesBackground.tsx em src/components/ (ou src/effects/).
+2. No layout (src/app/layout.tsx):
+
+   import ParticlesBackground from "@/components/ParticlesBackground";
+
+   export default function RootLayout({ children }) {
+     return (
+       <html lang="pt-BR" className="dark">
+         <body className="relative min-h-screen antialiased">
+           <ParticlesBackground />
+           <div className="relative z-10">{children}</div>
+         </body>
+       </html>
+     );
+   }
+
+3. No globals.css, adiciona o bloco de estilo do body (ver estilo-fundo.css).
+
+Dependência: framer-motion (npm install framer-motion).

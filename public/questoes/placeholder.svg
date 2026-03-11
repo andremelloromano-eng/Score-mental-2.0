@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240" fill="none">
+  <rect width="400" height="240" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <text x="200" y="115" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="14">Imagem da questao</text>
+  <text x="200" y="140" text-anchor="middle" fill="#475569" font-family="system-ui,sans-serif" font-size="12">Adicione pergunta-N.png em public/questoes/</text>
+</svg>

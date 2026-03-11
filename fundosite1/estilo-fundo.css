@@ -1,0 +1,11 @@
+/* Fundo da página — essência fundosite1
+   Colar no teu globals.css ou usar no body */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: radial-gradient(circle at top, #1f2937 0, #020617 40%, #020617 100%);
+  min-height: 100vh;
+}

@@ -1,0 +1,41 @@
+---
+description: Convenções do projeto — sugestões ao final das tarefas e estrutura de pastas (efeitos, texto, imagens)
+alwaysApply: true
+---
+
+# Convenções do projeto
+
+## 1. Sugestões ao final de cada tarefa
+
+Sempre que terminar uma tarefa para o usuário:
+
+- Dar **2 a 3 sugestões curtas** (próximos passos, melhorias ou ideias) para o projeto.
+- Manter as sugestões objetivas e acionáveis.
+
+## 2. Estrutura de pastas por tipo
+
+O projeto organiza recursos em pastas específicas para facilitar o trabalho:
+
+| Tipo    | Pasta              | Uso |
+|---------|--------------------|-----|
+| Efeitos | `src/effects/`     | Componentes e lógica de efeitos visuais: partículas, tilt 3D, glow, animações de UI. |
+| Texto   | `src/content/`     | Textos da interface, copy, constantes de UI e mensagens (não dados de perguntas). |
+| Imagens | `public/images/`   | Imagens gerais do site (logos, ícones, ilustrações). Questões em `public/questoes/`. |
+| Sons    | `public/sounds/`   | Ficheiros de áudio (hover, cliques, notificações). Lógica de reprodução em `src/lib/` quando necessário. |
+
+## 3. Quando algo não tiver pasta óbvia
+
+Se for adicionar ou criar algo que não se encaixe claramente numa pasta existente:
+
+- **Avisar o usuário:** por exemplo: *"Olha, devemos criar uma pasta para aquilo"*.
+- Sugerir um nome e local (ex.: `src/effects/` para novo efeito, `src/content/` para novos textos).
+- Manter a mesma convenção: efeito → effects, texto/copy → content, imagens → public.
+
+## 4. Resumo para o agente
+
+- Ao **finalizar** uma tarefa: incluir 2–3 sugestões.
+- Ao **criar** efeitos visuais: preferir `src/effects/`.
+- Ao **criar** textos/copy da UI: preferir `src/content/`.
+- Ao **usar** imagens novas: `public/images/` (geral) ou `public/questoes/` (só questões).
+- Ao **usar** sons: ficheiros em `public/sounds/`; helpers em `src/lib/` (ex.: `hoverSound.ts`).
+- Se não houver pasta adequada: avisar e sugerir criar uma (e onde).

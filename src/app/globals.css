@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-background text-foreground;
+  background: radial-gradient(circle at top, #1f2937 0, #020617 40%, #020617 100%);
+}
+
+.glass-card {
+  @apply bg-card/80 border border-border/60 shadow-soft rounded-3xl backdrop-blur-xl;
+}
+
+.accent-ring {
+  @apply ring-2 ring-accent/60 ring-offset-2 ring-offset-background;
+}
+
+.button-primary {
+  @apply relative inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+
+.button-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-border/70 bg-card/40 px-4 py-2 text-xs font-medium text-foreground/80 transition hover:border-accent/70 hover:text-foreground;
+}
+
+.pill {
+  @apply inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-accent/90;
+}
+
+.input {
+  @apply w-full rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-sm text-foreground shadow-inner shadow-black/40 outline-none transition placeholder:text-muted/70 focus:border-accent focus:ring-1 focus:ring-accent;
+}
+
+.badge-soft {
+  @apply inline-flex items-center gap-1 rounded-full bg-accent-soft/50 px-2.5 py-1 text-[11px] font-medium text-accent;
+}
+
+@keyframes particle-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.9;
+  }
+  12.5% {
+    transform: translate(28px, -22px);
+    opacity: 1;
+  }
+  25% {
+    transform: translate(18px, 18px);
+    opacity: 0.85;
+  }
+  37.5% {
+    transform: translate(-24px, 28px);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(-32px, -12px);
+    opacity: 0.8;
+  }
+  62.5% {
+    transform: translate(-18px, -26px);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(22px, -18px);
+    opacity: 0.9;
+  }
+  87.5% {
+    transform: translate(30px, 12px);
+    opacity: 0.95;
+  }
+}
+
+@keyframes particle-float-alt {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.9;
+  }
+  20% {
+    transform: translate(-26px, 20px);
+    opacity: 0.85;
+  }
+  40% {
+    transform: translate(20px, 30px);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(30px, -20px);
+    opacity: 0.8;
+  }
+  80% {
+    transform: translate(-20px, -28px);
+    opacity: 0.95;
+  }
+}
+
+@keyframes badge-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.75);
+  }
+}
+
+.badge-glow-pulse {
+  animation: badge-glow 3s ease-in-out infinite;
+}
+
+.sucesso-card-celebrate {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+
