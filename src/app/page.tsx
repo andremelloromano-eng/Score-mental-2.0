@@ -435,8 +435,10 @@ export default function HomePage() {
 
       if (data.url) {
         console.log("🔗 URL de pagamento gerada:", data.url);
-        window.location.href = data.url;
+        // FLUXO DE ABA EXTERNA: abre em nova aba e fica aguardando
+        window.open(data.url, '_blank');
         setPixAberto(true);
+        // Não redireciona, fica na página original aguardando
       }
 
       if (!pid) {
@@ -471,14 +473,14 @@ export default function HomePage() {
     }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando polling AGRESSIVO a cada 1s para paymentId:", pid);
+    console.log("🔍 Iniciando monitoramento a cada 2s para paymentId:", pid);
     pollingRef.current = setInterval(async () => {
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
         const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
         console.log("🔍 Status polling:", { pid, status: statusData?.status });
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado! Redirecionando forçado para /sucesso");
+          console.log("✅ Pagamento aprovado! Exibindo sucesso");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -488,15 +490,14 @@ export default function HomePage() {
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
-          // Redirecionamento garantido para mobile
-          window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
-          return; // Garante que nada mais execute
+          // Não redireciona, apenas exibe sucesso na página
+          return;
         }
       } catch (err) {
         console.error("🔍 Erro no polling:", err);
         return;
       }
-    }, 1000); // POLLING AGRESSIVO: 1 segundo
+    }, 2000); // POLLING DE MONITORAMENTO: 2 segundos
 
     return () => {
       if (pollingRef.current) {
@@ -515,22 +516,22 @@ export default function HomePage() {
     }
   }, [checkoutOpen]);
 
-  // GATILHO DE VISIBILIDADE MOBILE: Verifica status quando usuário volta do app do banco
+  // MONITORAMENTO EM SEGUNDO PLANO: Verifica quando usuário volta da aba do Mercado Pago
   useEffect(() => {
     if (!paymentId || checkoutAprovado) return;
 
-    // VERIFICAÇÃO IMEDIATA quando usuário volta para o navegador
-    const handleFocus = async () => {
+    // VERIFICAÇÃO IMEDIATA quando usuário volta para nossa aba
+    const handleWindowFocus = async () => {
       if (!paymentId) return;
       
-      console.log("📱 FOCO detectado - verificação IMEDIATA de status");
+      console.log("📱 FOCO na janela - usuário voltou do Mercado Pago");
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
         const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
-        console.log("📱 Status no foco:", { paymentId, status: statusData?.status });
+        console.log("📱 Status ao voltar:", { paymentId, status: statusData?.status });
         
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado no foco! Redirecionando...");
+          console.log("✅ Pagamento aprovado ao voltar! Exibindo sucesso");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -540,30 +541,19 @@ export default function HomePage() {
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
-          window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
         }
       } catch (err) {
-        console.error("📱 Erro na verificação no foco:", err);
+        console.error("📱 Erro na verificação ao voltar:", err);
       }
     };
 
-    // VERIFICAÇÃO quando página fica visível (complementar)
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && paymentId) {
-        console.log("📱 Página visível - verificação imediata");
-        await handleFocus();
-      }
-    };
-
-    // Adicionar ambos os listeners para máxima cobertura
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Adicionar listener de foco da janela
+    window.addEventListener('focus', handleWindowFocus);
     
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [paymentId, checkoutAprovado, email]);
+  }, [paymentId, checkoutAprovado]);
 
   // Função de verificação manual (botão)
   const handleManualCheck = async () => {
@@ -576,7 +566,7 @@ export default function HomePage() {
       console.log("🔘 Status manual:", { paymentId, status: statusData?.status });
       
       if (statusData?.status === "approved") {
-        console.log("✅ Pagamento aprovado na verificação manual! Redirecionando...");
+        console.log("✅ Pagamento aprovado na verificação manual! Exibindo sucesso");
         if (pollingRef.current) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
@@ -586,7 +576,6 @@ export default function HomePage() {
         setPaymentId(null);
         setErroEnvio(null);
         setPixAberto(false);
-        window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
       } else {
         // Feedback visual de que ainda não foi aprovado
         console.log("⏳ Ainda não aprovado na verificação manual");
@@ -971,6 +960,13 @@ export default function HomePage() {
                     </div>
                   )}
 
+                  {pixAberto && !checkoutAprovado && (
+                    <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-3 py-2.5 text-xs text-blue-100">
+                      📱 Aguardando pagamento na outra aba... Assim que confirmar, seu resultado aparecerá aqui.
+                    </div>
+                  )}
+
+                  {!pixAberto && (
                   <form onSubmit={handlePagamentoSimulado} className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">
@@ -1060,6 +1056,7 @@ export default function HomePage() {
                       <span>Dados tratados com criptografia.</span>
                     </div>
                   </form>
+                  )}
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
