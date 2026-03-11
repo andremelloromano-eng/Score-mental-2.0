@@ -489,7 +489,7 @@ export default function HomePage() {
           setErroEnvio(null);
           setPixAberto(false);
           // Redirecionamento forçado - prioridade máxima
-          window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
+          window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
           return; // Garante que nada mais execute
         }
       } catch (err) {
@@ -514,6 +514,72 @@ export default function HomePage() {
       console.log("🔍 Polling parado pelo fechamento do modal");
     }
   }, [checkoutOpen]);
+
+  // GATILHO DE VISIBILIDADE MOBILE: Verifica status quando usuário volta do app do banco
+  useEffect(() => {
+    if (!paymentId || checkoutAprovado) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && paymentId) {
+        console.log("📱 Usuário voltou ao app - verificação imediata de status");
+        try {
+          const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
+          const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
+          console.log("📱 Status verificado ao voltar:", { paymentId, status: statusData?.status });
+          
+          if (statusData?.status === "approved") {
+            console.log("✅ Pagamento aprovado ao voltar! Redirecionando...");
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current);
+              pollingRef.current = null;
+            }
+            setCheckoutAprovado(true);
+            setCheckoutOpen(false);
+            setPaymentId(null);
+            setErroEnvio(null);
+            setPixAberto(false);
+            window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
+          }
+        } catch (err) {
+          console.error("📱 Erro na verificação ao voltar:", err);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [paymentId, checkoutAprovado, email]);
+
+  // Função de verificação manual (botão)
+  const handleManualCheck = async () => {
+    if (!paymentId) return;
+    
+    console.log("🔘 Verificação manual disparada pelo usuário");
+    try {
+      const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
+      const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
+      console.log("🔘 Status manual:", { paymentId, status: statusData?.status });
+      
+      if (statusData?.status === "approved") {
+        console.log("✅ Pagamento aprovado na verificação manual! Redirecionando...");
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setCheckoutAprovado(true);
+        setCheckoutOpen(false);
+        setPaymentId(null);
+        setErroEnvio(null);
+        setPixAberto(false);
+        window.location.replace(`/sucesso?email=${encodeURIComponent(email)}&celebrated=1`);
+      } else {
+        // Feedback visual de que ainda não foi aprovado
+        console.log("⏳ Ainda não aprovado na verificação manual");
+      }
+    } catch (err) {
+      console.error("🔘 Erro na verificação manual:", err);
+    }
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
@@ -962,6 +1028,17 @@ export default function HomePage() {
                     >
                       {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                     </button>
+
+                    {/* BOTÃO DE VERIFICAÇÃO MANUAL - PLANO B MOBILE */}
+                    {pixAberto && paymentId && !checkoutAprovado && (
+                      <button
+                        type="button"
+                        onClick={handleManualCheck}
+                        className="button-secondary w-full justify-center text-xs"
+                      >
+                        Já paguei? Verificar agora
+                      </button>
+                    )}
 
                     <div className="mt-1 flex items-center justify-between text-[10px] text-muted">
                       <span>Transação segura e confidencial.</span>
