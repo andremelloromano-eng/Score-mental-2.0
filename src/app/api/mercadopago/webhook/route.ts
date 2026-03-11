@@ -150,11 +150,17 @@ async function handleWebhook(request: Request, body: unknown) {
     return NextResponse.json({ received: true });
   }
 
+  // WEBHOOK DE ALTA VELOCIDADE: Registrar aprovação imediatamente
+  console.log("[mercadopago/webhook] ✅ Pagamento APROVADO - registrando em alta velocidade", { paymentId, externalReference });
+  
   const first = await acquirePaymentDeliveryOnce(paymentId);
   if (!first) {
     console.log("[mercadopago/webhook] idempotência: pagamento já processado", { paymentId });
     return NextResponse.json({ received: true });
   }
+
+  // Aprovação registrada - agora prossegue com envio de e-mail (segundo plano)
+  console.log("[mercadopago/webhook] 🚀 Iniciando envio de e-mail em segundo plano", { paymentId });
 
   if (typeof externalReference !== "string" || !externalReference) {
     console.error("[mercadopago/webhook] external_reference ausente", { paymentId });

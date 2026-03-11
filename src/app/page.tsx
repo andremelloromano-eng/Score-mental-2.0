@@ -471,14 +471,14 @@ export default function HomePage() {
     }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando polling de status a cada 2s para paymentId:", pid);
+    console.log("🔍 Iniciando polling robusto a cada 1.5s para paymentId:", pid);
     pollingRef.current = setInterval(async () => {
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
         const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
         console.log("🔍 Status polling:", { pid, status: statusData?.status });
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado! Redirecionando para /sucesso");
+          console.log("✅ Pagamento aprovado! Redirecionando forçado para /sucesso");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -488,13 +488,15 @@ export default function HomePage() {
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
+          // Redirecionamento forçado - prioridade máxima
           window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`;
+          return; // Garante que nada mais execute
         }
       } catch (err) {
         console.error("🔍 Erro no polling:", err);
         return;
       }
-    }, 2000);
+    }, 1500);
 
     return () => {
       if (pollingRef.current) {

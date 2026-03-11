@@ -4,7 +4,7 @@ import { Resend } from "resend";
 import { renderToBuffer } from "@react-pdf/renderer";
 import perguntas from "@/data/perguntas.json";
 import { createPremiumCertificateDocument } from "@/lib/PremiumCertificate";
-import { acquirePaymentDeliveryOnce } from "@/lib/mercadoPagoIdempotency";
+import { acquirePaymentDeliveryOnce, isPaymentProcessed } from "@/lib/mercadoPagoIdempotency";
 
 export const runtime = "nodejs";
 
@@ -92,6 +92,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
     }
 
+    // VERIFICAÇÃO DE ALTA VELOCIDADE: Se já foi processado localmente, retorna approved imediatamente
+    const alreadyProcessed = await isPaymentProcessed(id);
+    if (alreadyProcessed) {
+      console.log("[mercadopago/status] ⚡ Pagamento já processado localmente - retorno rápido", { id });
+      return NextResponse.json({ id, status: "approved", delivered: true, fastTrack: true });
+    }
+
+    // Se não foi processado localmente, consulta Mercado Pago
+    console.log("[mercadopago/status] Consultando Mercado Pago", { id });
     const mpClient = getMpClient();
     const payment = new Payment(mpClient);
     const mpPayment = await payment.get({ id });
