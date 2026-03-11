@@ -217,6 +217,8 @@ export default function HomePage() {
   const [proximaIndexPendente, setProximaIndexPendente] = useState<number | null>(null);
   const [imagemFalhou, setImagemFalhou] = useState(false);
   const [opcaoSelecionadaAtual, setOpcaoSelecionadaAtual] = useState<string | null>(null);
+  const [pagamentoUrl, setPagamentoUrl] = useState<string | null>(null);
+  const [tempoExpiracao, setTempoExpiracao] = useState(600); // 10 minutos em segundos
   const intervaloRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const successSoundPlayedRef = useRef(false);
@@ -435,10 +437,11 @@ export default function HomePage() {
 
       if (data.url) {
         console.log("🔗 URL de pagamento gerada:", data.url);
-        // FLUXO DE ABA EXTERNA: abre em nova aba e fica aguardando
-        window.open(data.url, '_blank');
+        // FLUXO DE ABA EXTERNA: abre em nova aba no mesmo evento do clique
+        setPagamentoUrl(data.url);
         setPixAberto(true);
-        // Não redireciona, fica na página original aguardando
+        // Abrir imediatamente no mesmo evento para não ser bloqueado
+        window.open(data.url, '_blank');
       }
 
       if (!pid) {
@@ -515,6 +518,33 @@ export default function HomePage() {
       console.log("🔍 Polling parado pelo fechamento do modal");
     }
   }, [checkoutOpen]);
+
+  // CRONÔMETRO DE EXPIRAÇÃO: Contagem regressiva de 10 minutos
+  useEffect(() => {
+    if (!pixAberto || checkoutAprovado) return;
+
+    const intervalo = setInterval(() => {
+      setTempoExpiracao((prev) => {
+        if (prev <= 1) {
+          console.log("⏰ Tempo de pagamento expirado");
+          setPixAberto(false);
+          setPagamentoUrl(null);
+          setErroEnvio("Tempo de pagamento expirado. Tente novamente.");
+          return 600; // Reset para 10 minutos
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [pixAberto, checkoutAprovado]);
+
+  // Formatar tempo para MM:SS
+  const formatarTempo = (segundos: number) => {
+    const mins = Math.floor(segundos / 60);
+    const secs = segundos % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // MONITORAMENTO EM SEGUNDO PLANO: Verifica quando usuário volta da aba do Mercado Pago
   useEffect(() => {
@@ -938,7 +968,8 @@ export default function HomePage() {
                 <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
                   <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
-                      <Dialog.Title className="text-lg font-semibold text-white">
+                      <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
+                        <span className="text-green-400">✓</span>
                         Checkout seguro • R$ 6,00
                       </Dialog.Title>
                       <Dialog.Description className="mt-1 text-xs text-muted">
@@ -955,14 +986,32 @@ export default function HomePage() {
                   </div>
 
                   {checkoutAprovado && (
-                    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-100">
-                      Pagamento confirmado! Seu certificado de 12 páginas foi enviado para o e-mail: {email}
+                    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-6 text-center">
+                      <div className="text-3xl mb-3">🎉</div>
+                      <div className="text-lg font-bold text-emerald-100 mb-2">
+                        Sucesso!
+                      </div>
+                      <div className="text-xs text-emerald-200 mb-4">
+                        Pagamento confirmado! Seu certificado de 12 páginas foi enviado para o e-mail: {email}
+                      </div>
+                      <button
+                        onClick={() => window.location.href = `/sucesso?email=${encodeURIComponent(email)}&celebrated=1`}
+                        className="w-full button-emerald justify-center text-sm font-medium"
+                      >
+                        📥 Baixar meu Certificado
+                      </button>
                     </div>
                   )}
 
                   {pixAberto && !checkoutAprovado && (
                     <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-3 py-2.5 text-xs text-blue-100">
-                      📱 Aguardando pagamento na outra aba... Assim que confirmar, seu resultado aparecerá aqui.
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span>📱 Aguardando pagamento na outra aba...</span>
+                      </div>
+                      <div className="text-center text-blue-200 font-mono text-xs">
+                        ⏰ Expira em: {formatarTempo(tempoExpiracao)}
+                      </div>
                     </div>
                   )}
 
