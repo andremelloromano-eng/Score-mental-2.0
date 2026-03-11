@@ -18,16 +18,20 @@ type PendingCheckoutPayload = Required<Pick<Payload, "email" | "nome">> &
 export const runtime = "nodejs";
 
 function getPublicBaseUrl(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (!baseUrl) {
-    throw new Error("NEXT_PUBLIC_BASE_URL não configurado. Use a URL https do seu túnel (localtunnel/ngrok). ");
-  }
-  if (!baseUrl.startsWith("https://")) {
+  const baseUrlRaw =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (!baseUrlRaw) {
     throw new Error(
-      "NEXT_PUBLIC_BASE_URL precisa começar com https:// (Mercado Pago exige notification_url pública HTTPS)."
+      "NEXT_PUBLIC_SITE_URL/NEXT_PUBLIC_BASE_URL não configurado. Use a URL https pública do seu domínio."
     );
   }
-  return baseUrl.replace(/\/$/, "");
+  const baseUrl = baseUrlRaw.replace(/\.$/, "").replace(/\/$/, "");
+  if (!baseUrl.startsWith("https://")) {
+    throw new Error(
+      "NEXT_PUBLIC_SITE_URL/NEXT_PUBLIC_BASE_URL precisa começar com https:// (Mercado Pago exige notification_url pública HTTPS)."
+    );
+  }
+  return baseUrl;
 }
 
 function getPendingStore(): Map<string, PendingCheckoutPayload> {

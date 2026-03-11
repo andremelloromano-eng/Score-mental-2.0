@@ -1262,7 +1262,7 @@ export function createPremiumCertificateDocument(
           </View>
           <View style={{ marginTop: 16 }}>
             <Text style={styles.paragraph}>
-              A linha vertical representa sua posição ("Você"). Seu percentil estimado é {percentil}º. Valores são aproximados e
+              A linha vertical representa sua posição ({`"Você"`}). Seu percentil estimado é {percentil}º. Valores são aproximados e
               servem como referência comparativa.
             </Text>
           </View>

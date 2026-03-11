@@ -232,7 +232,7 @@ async function handleWebhook(request: Request, body: unknown) {
 
   const pdfBuffer = await renderToBuffer(doc);
 
-  const fromAddress = process.env.RESEND_FROM_EMAIL || "Teste de QI <onboarding@resend.dev>";
+  const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "relatorio@send.scoremental.com.br";
   const { data, error } = await resendClient.emails.send({
     from: fromAddress,
     to: pending.email,
