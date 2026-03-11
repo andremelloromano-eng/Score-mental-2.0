@@ -190,7 +190,7 @@ type Pergunta = {
   opcoes: Opcao[];
 };
 
-type Fase = "intro" | "quiz" | "resultado-pronto";
+type Fase = "intro" | "quiz" | "resultado-pronto" | "aguardando-pagamento" | "sucesso";
 
 const perguntasTyped = perguntas as Pergunta[];
 
@@ -454,17 +454,10 @@ export default function HomePage() {
       if (data.url) {
         console.log("🔗 URL de pagamento gerada:", data.url);
         
-        if (isMobile) {
-          // FLUXO MOBILE: abre em nova aba e mostra tela de aguardando
-          setPagamentoUrl(data.url);
-          setPixAberto(true);
-          // Abrir imediatamente no mesmo evento para não ser bloqueado
-          window.open(data.url, '_blank');
-        } else {
-          // FLUXO DESKTOP: redireciona na mesma janela (funcionava antes)
-          window.location.href = data.url;
-          setPixAberto(true);
-        }
+        // FLUXO DE CLIQUE ÚNICO: Salva a URL mas NÃO abre automaticamente para evitar bloqueio do Safari
+        setPagamentoUrl(data.url);
+        setPixAberto(true);
+        // O botão no formulário mudará para "ABRIR PAGAMENTO PIX"
       }
 
       if (!pid) {
@@ -490,12 +483,9 @@ export default function HomePage() {
     };
   }, []);
 
-  // POLLING E MONITORAMENTO: Apenas para mobile ou quando o modal está aberto
+  // POLLING E MONITORAMENTO: Para todos quando estiver em aguardando-pagamento
   useEffect(() => {
-    // Desktop não usa polling (redireciona direto)
-    if (!isMobile && !checkoutOpen) return;
-    
-    if (!checkoutOpen || !paymentId || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado) return;
 
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -503,7 +493,7 @@ export default function HomePage() {
     }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando monitoramento para paymentId:", pid, { isMobile });
+    console.log("🔍 Iniciando monitoramento para paymentId:", pid);
     pollingRef.current = setInterval(async () => {
       try {
         const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
@@ -515,9 +505,9 @@ export default function HomePage() {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
-          // Limpar estado completamente
+          // Limpar estado e mudar para fase de sucesso
           setCheckoutAprovado(true);
-          setCheckoutOpen(false);
+          setFase("sucesso");
           setPaymentId(null);
           setErroEnvio(null);
           setPixAberto(false);
@@ -529,7 +519,7 @@ export default function HomePage() {
         console.error("🔍 Erro no polling:", err);
         return;
       }
-    }, isMobile ? 2000 : 1500); // Mobile: 2s, Desktop: 1.5s (se precisar)
+    }, 1500); // Polling a cada 1.5 segundos conforme especificação
 
     return () => {
       if (pollingRef.current) {
@@ -538,7 +528,7 @@ export default function HomePage() {
         console.log("🔍 Polling limpo");
       }
     };
-  }, [checkoutOpen, paymentId, checkoutAprovado, email, isMobile]);
+  }, [fase, paymentId, checkoutAprovado]);
 
   useEffect(() => {
     if (!checkoutOpen && pollingRef.current) {
@@ -548,12 +538,9 @@ export default function HomePage() {
     }
   }, [checkoutOpen]);
 
-  // CRONÔMETRO DE EXPIRAÇÃO: Apenas para mobile
+  // CRONÔMETRO DE EXPIRAÇÃO: Para todos quando estiver em aguardando-pagamento
   useEffect(() => {
-    // Desktop não usa cronômetro
-    if (!isMobile) return;
-    
-    if (!pixAberto || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !pixAberto || checkoutAprovado) return;
 
     const intervalo = setInterval(() => {
       setTempoExpiracao((prev) => {
@@ -562,6 +549,7 @@ export default function HomePage() {
           setPixAberto(false);
           setPagamentoUrl(null);
           setErroEnvio("Tempo de pagamento expirado. Tente novamente.");
+          setFase("resultado-pronto"); // Volta para a tela de resultado
           return 600; // Reset para 10 minutos
         }
         return prev - 1;
@@ -569,7 +557,7 @@ export default function HomePage() {
     }, 1000);
 
     return () => clearInterval(intervalo);
-  }, [pixAberto, checkoutAprovado, isMobile]);
+  }, [fase, pixAberto, checkoutAprovado]);
 
   // Formatar tempo para MM:SS
   const formatarTempo = (segundos: number) => {
@@ -578,50 +566,52 @@ export default function HomePage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // MONITORAMENTO EM SEGUNDO PLANO: Apenas para mobile - verifica quando usuário volta da aba
+  // MONITORAMENTO EM SEGUNDO PLANO: Para todos - verifica quando usuário volta da aba
   useEffect(() => {
-    // Desktop não usa monitoramento de focus
-    if (!isMobile) return;
-    
-    if (!paymentId || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado) return;
 
     // VERIFICAÇÃO IMEDIATA quando usuário volta para nossa aba
-    const handleWindowFocus = async () => {
-      if (!paymentId) return;
-      
-      console.log("📱 FOCO na janela - usuário voltou do Mercado Pago");
-      try {
-        const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
-        const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
-        console.log("📱 Status ao voltar:", { paymentId, status: statusData?.status });
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && paymentId) {
+        console.log("📱 VISIBILIDADE alterada - Verificação imediata disparada");
         
-        if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado ao voltar! Limpando estado");
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
+        try {
+          // Usar caminho relativo para garantir que funcione em qualquer domínio (dev ou prod)
+          const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
+          const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
+          console.log("📱 Status na verificação imediata:", { paymentId, status: statusData?.status });
+          
+          if (statusData?.status === "approved") {
+            console.log("✅ Pagamento aprovado na verificação imediata!");
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current);
+              pollingRef.current = null;
+            }
+            setCheckoutAprovado(true);
+            setFase("sucesso");
+            setPaymentId(null);
+            setErroEnvio(null);
+            setPixAberto(false);
+            setPagamentoUrl(null);
+            setTempoExpiracao(600);
           }
-          // Limpar estado completamente
-          setCheckoutAprovado(true);
-          setCheckoutOpen(false);
-          setPaymentId(null);
-          setErroEnvio(null);
-          setPixAberto(false);
-          setPagamentoUrl(null);
-          setTempoExpiracao(600); // Reset timer
+        } catch (err) {
+          console.error("📱 Erro na verificação imediata:", err);
         }
-      } catch (err) {
-        console.error("📱 Erro na verificação ao voltar:", err);
       }
     };
 
-    // Adicionar listener de foco da janela
-    window.addEventListener('focus', handleWindowFocus);
+    // Adicionar listeners para garantir captura em todos os navegadores (especialmente Safari Mobile)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    window.addEventListener('pageshow', handleVisibilityChange);
     
     return () => {
-      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('pageshow', handleVisibilityChange);
     };
-  }, [paymentId, checkoutAprovado, isMobile]);
+  }, [fase, paymentId, checkoutAprovado]);
 
   // Função de verificação manual (botão)
   const handleManualCheck = async () => {
@@ -634,17 +624,19 @@ export default function HomePage() {
       console.log("🔘 Status manual:", { paymentId, status: statusData?.status });
       
       if (statusData?.status === "approved") {
-        console.log("✅ Pagamento aprovado na verificação manual! Exibindo sucesso");
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-        setCheckoutAprovado(true);
-        setCheckoutOpen(false);
-        setPaymentId(null);
-        setErroEnvio(null);
-        setPixAberto(false);
-      } else {
+          console.log("✅ Pagamento aprovado na verificação manual! Exibindo sucesso");
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          setCheckoutAprovado(true);
+          setFase("sucesso");
+          setPaymentId(null);
+          setErroEnvio(null);
+          setPixAberto(false);
+          setPagamentoUrl(null);
+          setTempoExpiracao(600);
+        } else {
         // Feedback visual de que ainda não foi aprovado
         console.log("⏳ Ainda não aprovado na verificação manual");
       }
@@ -661,6 +653,7 @@ export default function HomePage() {
         </div>
 
         <section className="glass-card flex-1 p-6 md:p-8">
+          {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
           <header className="mb-6 flex items-start justify-between gap-4">
             <div className="space-y-3">
               <span className="pill">Teste de QI Profissional</span>
@@ -678,8 +671,9 @@ export default function HomePage() {
               <p>Resultados confidenciais e criptografados</p>
             </div>
           </header>
+          )}
 
-          {fase !== "intro" && (
+          {fase !== "intro" && fase !== "aguardando-pagamento" && fase !== "sucesso" && (
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between text-[11px] text-muted">
                 <span>
@@ -1023,31 +1017,6 @@ export default function HomePage() {
                     </Dialog.Close>
                   </div>
 
-                  {checkoutAprovado && (
-                    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-center">
-                      <div className="text-2xl mb-2">✅</div>
-                      <div className="text-sm font-semibold text-emerald-100 mb-2">
-                        Pagamento Confirmado!
-                      </div>
-                      <div className="text-xs text-emerald-200">
-                        Seu certificado foi enviado para: {email}
-                      </div>
-                    </div>
-                  )}
-
-                  {pixAberto && !checkoutAprovado && isMobile && (
-                    <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-3 py-2.5 text-xs text-blue-100">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span>📱 Aguardando pagamento na outra aba...</span>
-                      </div>
-                      <div className="text-center text-blue-200 font-mono text-xs">
-                        ⏰ Expira em: {formatarTempo(tempoExpiracao)}
-                      </div>
-                    </div>
-                  )}
-
-                  {!pixAberto && (
                   <form onSubmit={handlePagamentoSimulado} className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">
@@ -1113,22 +1082,31 @@ export default function HomePage() {
                       </div>
                     )}
 
-                    <button
-                      type="submit"
-                      disabled={pagando || !email || !nome}
-                      className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
-                    </button>
-
-                    {/* BOTÃO DE VERIFICAÇÃO MANUAL - Apenas mobile */}
-                    {pixAberto && paymentId && !checkoutAprovado && isMobile && (
+                    {pixAberto && pagamentoUrl ? (
+                      <div className="space-y-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSecureConfirmationSound();
+                            setFase("aguardando-pagamento");
+                            setCheckoutOpen(false);
+                            window.open(pagamentoUrl, '_blank');
+                          }}
+                          className="button-primary w-full justify-center bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 text-sm py-4 animate-pulse"
+                        >
+                          ABRIR PAGAMENTO PIX
+                        </button>
+                        <p className="text-[10px] text-center text-emerald-400 font-medium">
+                          Link gerado! Clique acima para abrir o Mercado Pago e pagar.
+                        </p>
+                      </div>
+                    ) : (
                       <button
-                        type="button"
-                        onClick={handleManualCheck}
-                        className="button-secondary w-full justify-center text-xs"
+                        type="submit"
+                        disabled={pagando || !email || !nome}
+                        className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Já paguei? Verificar agora
+                        {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                       </button>
                     )}
 
@@ -1137,13 +1115,99 @@ export default function HomePage() {
                       <span>Dados tratados com criptografia.</span>
                     </div>
                   </form>
-                  )}
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
           )}
+
+          {fase === "aguardando-pagamento" && (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-accent animate-pulse">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold text-white">Aguardando Pagamento</h2>
+                <p className="text-muted text-sm max-w-xs mx-auto">
+                  Por favor, finalize o pagamento na aba do Mercado Pago que foi aberta.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                <div className="w-full rounded-2xl border border-blue-500/40 bg-blue-500/10 px-4 py-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-blue-200">Tempo restante</span>
+                    <span className="font-mono text-sm text-blue-100 font-bold">
+                      {formatarTempo(tempoExpiracao)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-blue-900/50 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-blue-400"
+                      initial={{ width: "100%" }}
+                      animate={{ width: `${(tempoExpiracao / 600) * 100}%` }}
+                      transition={{ duration: 1, ease: "linear" }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleManualCheck}
+                  className="button-secondary w-full justify-center text-sm py-3"
+                >
+                  Já paguei? Verificar agora
+                </button>
+
+                {pagamentoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(pagamentoUrl, '_blank')}
+                    className="text-xs text-muted hover:text-accent transition-colors"
+                  >
+                    Não abriu a aba? Clique aqui para abrir novamente
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {fase === "sucesso" && (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                <svg className="w-10 h-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">Pagamento Confirmado!</h2>
+                <p className="text-muted text-sm max-w-md mx-auto leading-relaxed">
+                  Seu Relatório Detalhado + Certificado PDF foram enviados para o e-mail: <br/>
+                  <span className="font-semibold text-foreground">{email}</span>
+                </p>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => window.location.href = "/"}
+                  className="button-primary px-8"
+                >
+                  Voltar ao início
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
+        {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
         <aside className="glass-card relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex">
           <div className="space-y-4 text-xs text-muted">
             <p className="badge-soft">
@@ -1199,11 +1263,12 @@ export default function HomePage() {
           <div className="mt-6 border-t border-border/50 pt-4 text-[11px] text-muted">
             <p>Protótipo de interface para teste de QI profissional com paywall elegante.</p>
             <p className="mt-1 text-xs text-foreground/70">
-              Ideal para validar jornada de usuário, experiência de pagamento e
+              Ideal para validar jornada de usuário, experiênia de pagamento e
               percepção de valor em produtos de avaliação.
             </p>
           </div>
         </aside>
+        )}
       </div>
     </main>
   );
