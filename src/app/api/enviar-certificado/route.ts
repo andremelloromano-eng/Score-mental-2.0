@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "relatorio@send.scoremental.com.br";
+    const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "relatorio@scoremental.com.br";
     console.log("[enviar-certificado] Enviando e-mail para:", email);
 
     const sendPayload = {

@@ -2,6 +2,7 @@ import React from "react";
 import {
   Document,
   type DocumentProps,
+  Font,
   Page,
   Text,
   View,
@@ -104,6 +105,27 @@ const AREAS: PremiumCertificateArea[] = [
   }
 
 ];
+
+let hyphenationDisabled = false;
+if (!hyphenationDisabled) {
+  Font.registerHyphenationCallback((word) => [word]);
+  hyphenationDisabled = true;
+}
+
+function effectiveNameLength(name: string): number {
+  const normalized = String(name ?? "").trim().replace(/\s+/g, " ");
+  if (!normalized) return 0;
+  const parts = normalized.split(" ");
+  const longest = Math.max(...parts.map((p) => p.length));
+  return normalized.length + Math.max(0, longest - 14) * 2;
+}
+
+function adaptiveNameFontSize(name: string, maxSize: number, minSize: number): number {
+  const len = effectiveNameLength(name);
+  if (len <= 18) return maxSize;
+  const t = clamp((len - 18) / 30, 0, 1);
+  return Math.round((maxSize + (minSize - maxSize) * t) * 10) / 10;
+}
 
 function NeuralBrainIcon({ size = 220 }: { size?: number }) {
   const s = size;
@@ -393,6 +415,11 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
     textAlign: "center",
     marginTop: 50
+  },
+  bigNameWrap: {
+    width: "100%",
+    paddingHorizontal: 10,
+    overflow: "hidden"
   },
   coverLayout: {
     flex: 1,
@@ -687,6 +714,11 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
     textAlign: "center",
     marginTop: 14
+  },
+  certificateNameWrap: {
+    width: "100%",
+    paddingHorizontal: 20,
+    overflow: "hidden"
   },
   certificateBody: {
     fontSize: 10,
@@ -1071,7 +1103,20 @@ export function createPremiumCertificateDocument(
       <Page size="A4" style={styles.page}>
         <Frame>
           <HeaderBlock nome={props.nome} dataEmissao={props.dataEmissao} />
-          <Text style={styles.bigName}>{props.nome}</Text>
+          <View style={styles.bigNameWrap}>
+            <Text
+              style={[
+                styles.bigName,
+                {
+                  fontSize: adaptiveNameFontSize(props.nome, 42, 20),
+                  marginTop: 50
+                }
+              ]}
+              wrap={false}
+            >
+              {props.nome}
+            </Text>
+          </View>
           <View style={styles.coverInfoRow}>
             <View style={styles.coverInfoBox}>
               <Text style={styles.coverInfoLabel}>QI Final</Text>
@@ -1355,7 +1400,20 @@ export function createPremiumCertificateDocument(
               </View>
             </View>
 
-            <Text style={styles.certificateName}>{props.nome}</Text>
+            <View style={styles.certificateNameWrap}>
+              <Text
+                style={[
+                  styles.certificateName,
+                  {
+                    fontSize: adaptiveNameFontSize(props.nome, 26, 16),
+                    marginTop: 14
+                  }
+                ]}
+                wrap={false}
+              >
+                {props.nome}
+              </Text>
+            </View>
             <Text style={styles.certificateBody}>
               Este certificado confirma a conclusão do Teste de QI Profissional, com análise baseada em {props.totalPerguntas} questões.
               O resultado abaixo reflete a pontuação final apurada com rigor estatístico.

@@ -6,6 +6,12 @@
   color-scheme: dark;
 }
 
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 body {
   @apply bg-background text-foreground;
   background: radial-gradient(circle at top, #1f2937 0, #020617 40%, #020617 100%);
@@ -25,6 +31,131 @@ body {
 
 .button-emerald {
   @apply relative inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+
+.button-cta {
+  @apply relative inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transform: translateZ(0);
+  background-image: linear-gradient(95deg, #2563eb 0%, #4f46e5 55%, #0ea5e9 100%);
+  background-size: 100% 100%;
+  background-position: 50% 50%;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.3s ease, filter 0.3s ease;
+}
+
+.button-cta:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.35), 0 0 0 6px rgba(106, 13, 173, 0.22);
+}
+
+.button-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  left: -60%;
+  width: 55%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.24) 32%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.22) 68%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: shine-sweep 3s ease-in-out infinite;
+}
+
+.button-cta > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.85;
+  }
+  20% {
+    transform: translateX(140%) skewX(-18deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(140%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.button-primary,
+.button-emerald {
+  overflow: hidden;
+  transform: translateZ(0);
+  transition: background-position 400ms ease;
+}
+
+.button-primary::after,
+.button-emerald::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  left: -60%;
+  width: 55%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 32%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.16) 68%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: shine-sweep 3s ease-in-out infinite;
+}
+
+@keyframes title-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.hero-title-shine {
+  background-image: linear-gradient(90deg, #ffffff 0%, #93c5fd 28%, #34d399 55%, #a855f7 100%);
+  background-size: 220% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shine 3s ease-in-out infinite;
+  transform: none;
+}
+
+.hero-title-shine:hover,
+.hero-title-shine:hover * {
+  transform: none !important;
+}
+
+.card-title-shine {
+  background-image: linear-gradient(90deg, #e2e8f0 0%, #bfdbfe 50%, #7dd3fc 100%);
+  background-size: 220% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shine 3s ease-in-out infinite;
+  font-weight: bold;
 }
 
 .button-ghost {
@@ -122,4 +253,164 @@ body {
   transform: translateZ(0);
 }
 
+@keyframes sucesso-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 
+@keyframes sucesso-swing {
+  0% {
+    transform: rotate(0deg);
+  }
+  18% {
+    transform: rotate(1.2deg);
+  }
+  42% {
+    transform: rotate(-1deg);
+  }
+  66% {
+    transform: rotate(0.6deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes sucesso-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sucesso-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sucesso-check-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes sucesso-glow {
+  0%,
+  100% {
+    opacity: 0.65;
+    filter: blur(14px);
+  }
+  50% {
+    opacity: 0.9;
+    filter: blur(18px);
+  }
+}
+
+@keyframes sucesso-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sucesso-card-celebrate {
+  animation: sucesso-pop 460ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    sucesso-swing 680ms ease-in-out 480ms both;
+}
+
+.sucesso-check-path {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  transform-origin: 50% 50%;
+  animation: sucesso-check-draw 620ms ease-out 120ms forwards,
+    sucesso-check-pulse 1.25s ease-in-out 860ms infinite;
+}
+
+.sucesso-text-reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: sucesso-fade-up 520ms ease-out forwards;
+}
+
+.sucesso-diploma {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.65), rgba(2, 6, 23, 0.35));
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 24px 80px rgba(2, 6, 23, 0.75);
+}
+
+.sucesso-diploma::before {
+  content: "";
+  position: absolute;
+  inset: -48px;
+  background: conic-gradient(
+    from 180deg,
+    rgba(16, 185, 129, 0.35),
+    rgba(99, 102, 241, 0.35),
+    rgba(168, 85, 247, 0.25),
+    rgba(16, 185, 129, 0.35)
+  );
+  animation: sucesso-spin 9s linear infinite, sucesso-glow 3.2s ease-in-out infinite;
+  z-index: 0;
+}
+
+.sucesso-diploma > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sucesso-cta {
+  background-image: linear-gradient(90deg, #34d399 0%, #6366f1 45%, #a855f7 100%);
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+}
+
+.sucesso-cta:hover {
+  background-position: 100% 50%;
+  transform: scale(1.03);
+}
+
+.sucesso-cta:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sucesso-card-celebrate,
+  .sucesso-check-path,
+  .sucesso-text-reveal,
+  .sucesso-diploma::before,
+  .sucesso-cta,
+  .button-primary::after,
+  .button-emerald::after,
+  .button-cta,
+  .button-cta::after,
+  .hero-title-shine {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .sucesso-text-reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

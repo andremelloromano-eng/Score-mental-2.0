@@ -96,7 +96,7 @@ function TiltCard({
       onMouseEnter={handleMouseEnter}
     >
       <motion.div
-        className={`relative h-full overflow-hidden rounded-2xl p-3 ring-1 transition-shadow duration-300 ${style.ring}`}
+        className={`relative h-full overflow-hidden rounded-2xl p-2 md:p-3 ring-1 transition-shadow duration-300 ${style.ring}`}
         style={{
           transformStyle: "preserve-3d",
           backgroundColor: style.bg,
@@ -123,52 +123,12 @@ function TiltCard({
 }
 
 function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const words = HERO_TITLE.split(/\s+/);
-
-  const getDistance = (i: number) =>
-    hoveredIndex === null ? 0 : Math.abs(i - hoveredIndex);
-
   return (
-    <h1 className="overflow-visible pl-px text-2xl font-semibold tracking-tight text-white md:text-3xl">
-      {words.map((word, i) => {
-        const isHovered = hoveredIndex === i;
-        const distance = getDistance(i);
-        const isNeighbor = distance === 1;
-        const isSecondRing = distance === 2;
-
-        const scale = isHovered ? 1.2 : isNeighbor ? 0.9 : isSecondRing ? 0.96 : 1;
-        const opacity = isHovered ? 1 : isNeighbor ? 0.8 : isSecondRing ? 0.9 : 1;
-        const y = isHovered ? -4 : isNeighbor ? 2 : isSecondRing ? 0.5 : 0;
-
-        return (
-          <span key={i} className="inline-block">
-            <motion.span
-              className="inline-block origin-center whitespace-nowrap"
-              onMouseEnter={() => {
-                setHoveredIndex(i);
-                onWordHover?.();
-              }}
-              onMouseLeave={() => setHoveredIndex(null)}
-              animate={{ scale, opacity, y }}
-              transition={{
-                type: "spring",
-                stiffness: 380,
-                damping: 24,
-              }}
-              style={{
-                touchAction: "manipulation",
-                textShadow: isHovered
-                  ? "0 0 20px rgba(255,255,255,0.45), 0 0 40px rgba(255,255,255,0.15)"
-                  : "none",
-              }}
-            >
-              {word}
-            </motion.span>
-            {i < words.length - 1 ? "\u00A0" : null}
-          </span>
-        );
-      })}
+    <h1
+      className="hero-title-shine overflow-visible pl-px text-2xl font-semibold tracking-tight md:text-3xl"
+      onMouseEnter={() => onWordHover?.()}
+    >
+      {HERO_TITLE}
     </h1>
   );
 }
@@ -223,6 +183,9 @@ export default function HomePage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const successSoundPlayedRef = useRef(false);
   const soundsUnlockedRef = useRef(false);
+  const paymentSuccessSoundPlayedRef = useRef(false);
+  const voltarInicioRef = useRef(false);
+  const [successMuted, setSuccessMuted] = useState(false);
 
   // Detecção de mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -272,9 +235,28 @@ export default function HomePage() {
     };
   }, [playDeepUiPulse, stopDeepUiPulse]);
 
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? window.localStorage.getItem("successMuted") : null;
+    if (stored === "1") setSuccessMuted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("successMuted", successMuted ? "1" : "0");
+  }, [successMuted]);
+
   const totalPerguntas = perguntasTyped.length;
+  const perguntaAtual = perguntasTyped[indiceAtual];
   const respondidas = Object.keys(respostas).length;
-  const progresso = (respondidas / totalPerguntas) * 100;
+  const respondidasParaUi =
+    fase === "resultado-pronto" || fase === "aguardando-pagamento" || fase === "sucesso"
+      ? totalPerguntas
+      : Math.min(
+          totalPerguntas,
+          respondidas + (fase === "quiz" && opcaoSelecionadaAtual && perguntaAtual && !respostas[perguntaAtual.id] ? 1 : 0)
+        );
+  const progresso = totalPerguntas > 0 ? (respondidasParaUi / totalPerguntas) * 100 : 0;
+  const perguntaNumeroParaUi = fase === "quiz" ? Math.min(totalPerguntas, indiceAtual + 1) : totalPerguntas;
 
   const acertos = perguntasTyped.reduce((acc, p) => {
     const resp = respostas[p.id];
@@ -303,7 +285,29 @@ export default function HomePage() {
     if (fase !== "resultado-pronto") successSoundPlayedRef.current = false;
   }, [fase, playSuccess]);
 
-  const perguntaAtual = perguntasTyped[indiceAtual];
+  useEffect(() => {
+    if (fase !== "sucesso") {
+      paymentSuccessSoundPlayedRef.current = false;
+      return;
+    }
+    if (paymentSuccessSoundPlayedRef.current) return;
+    if (successMuted) {
+      paymentSuccessSoundPlayedRef.current = true;
+      return;
+    }
+    if (soundsUnlockedRef.current) {
+      paymentSuccessSoundPlayedRef.current = true;
+      playAmbientAiryNotification();
+      return;
+    }
+    const handler = () => {
+      if (paymentSuccessSoundPlayedRef.current) return;
+      paymentSuccessSoundPlayedRef.current = true;
+      playAmbientAiryNotification();
+    };
+    window.addEventListener("pointerdown", handler, { once: true });
+    return () => window.removeEventListener("pointerdown", handler);
+  }, [fase, playAmbientAiryNotification, successMuted]);
 
   useEffect(() => {
     setOpcaoSelecionadaAtual(null);
@@ -368,10 +372,27 @@ export default function HomePage() {
     irParaProximaPergunta(indiceAtual + 1);
   }
 
+  const handleVoltarAoInicio = useCallback(() => {
+    if (voltarInicioRef.current) return;
+    voltarInicioRef.current = true;
+    if (!successMuted) {
+      playSuccessChimeSound(0.12, { duration: 0.35, fadeOut: 0.12 });
+    }
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 220);
+  }, [successMuted]);
+
   const handleTempoEsgotado = useCallback(() => {
+    if (fase === "quiz" && perguntaAtual && opcaoSelecionadaAtual && !respostas[perguntaAtual.id]) {
+      setRespostas((prev) => ({
+        ...prev,
+        [perguntaAtual.id]: opcaoSelecionadaAtual
+      }));
+    }
     setOpcaoSelecionadaAtual(null);
     irParaProximaPergunta(indiceAtual + 1);
-  }, [indiceAtual]);
+  }, [fase, indiceAtual, opcaoSelecionadaAtual, perguntaAtual, respostas]);
 
   useEffect(() => {
     if (fase !== "quiz" || mostrarMensagemMetade || animando) return;
@@ -677,7 +698,7 @@ export default function HomePage() {
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between text-[11px] text-muted">
                 <span>
-                  Pergunta {respondidas === totalPerguntas ? totalPerguntas : respondidas + 1}{" "}
+                  Pergunta {perguntaNumeroParaUi}{" "}
                   de {totalPerguntas}
                 </span>
                 <span>
@@ -719,30 +740,30 @@ export default function HomePage() {
 
           {fase === "intro" && (
             <div className="mt-4 space-y-6">
-              <div className="relative grid gap-3 text-xs md:grid-cols-3 md:text-sm">
-                <TiltCard className="min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
-                  <p className="font-medium text-white">
+              <div className="relative grid grid-cols-3 gap-1.5 text-[11px] md:gap-3 md:text-sm">
+                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
+                  <p className="card-title-shine">
                     Foco em contexto profissional
                   </p>
-                  <p className="mt-1 text-slate-200">
+                  <p className="mt-0.5 md:mt-1 text-gray-400">
                     Questões pensadas para simular tomada de decisão, lógica e
                     precisão em ambiente corporativo.
                   </p>
                 </TiltCard>
-                <TiltCard className="min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
-                  <p className="font-medium text-white">
+                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
+                  <p className="card-title-shine">
                     Relatório detalhado
                   </p>
-                  <p className="mt-1 text-slate-200">
+                  <p className="mt-0.5 md:mt-1 text-gray-400">
                     Perfil cognitivo, pontos fortes e oportunidades de
                     desenvolvimento enviados em PDF.
                   </p>
                 </TiltCard>
-                <TiltCard className="min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
-                  <p className="font-medium text-white">
+                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
+                  <p className="card-title-shine">
                     Certificado exclusivo
                   </p>
-                  <p className="mt-1 text-slate-200">
+                  <p className="mt-0.5 md:mt-1 text-gray-400">
                     Certificado digital com seu resultado para anexar ao
                     currículo ou LinkedIn.
                   </p>
@@ -757,7 +778,7 @@ export default function HomePage() {
                     playAmbientSwell();
                     handleIniciar();
                   }}
-                  className="button-primary accent-ring"
+                  className="button-cta accent-ring"
                 >
                   Iniciar teste agora
                 </button>
@@ -944,32 +965,32 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="relative grid gap-4 text-xs md:grid-cols-3 md:text-sm">
-                  <TiltCard className="min-h-[120px]" variant="neon-blue">
-                    <p className="font-medium text-white">
+                <div className="relative grid grid-cols-3 gap-1.5 text-[11px] md:gap-4 md:text-sm">
+                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
+                    <p className="card-title-shine">
                       O que você recebe
                     </p>
-                    <ul className="mt-1 space-y-1.5 text-slate-200">
+                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• QI estimado com explicação clara</li>
                       <li>• Perfil cognitivo profissional</li>
                       <li>• Pontos fortes e recomendações</li>
                     </ul>
                   </TiltCard>
-                  <TiltCard className="min-h-[120px]" variant="neon-blue">
-                    <p className="font-medium text-white">
+                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
+                    <p className="card-title-shine">
                       Certificado em PDF
                     </p>
-                    <ul className="mt-1 space-y-1.5 text-slate-200">
+                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• Assinatura digital verificada</li>
                       <li>• Ideal para currículo e LinkedIn</li>
                       <li>• Envio automático por e-mail</li>
                     </ul>
                   </TiltCard>
-                  <TiltCard className="min-h-[120px]" variant="neon-blue">
-                    <p className="font-medium text-white">
+                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
+                    <p className="card-title-shine">
                       Pagamento seguro
                     </p>
-                    <ul className="mt-1 space-y-1.5 text-slate-200">
+                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• Pagamento via Pix (prioritário) ou cartão</li>
                       <li>• Checkout Mercado Pago com confirmação automática</li>
                       <li>• Envio do PDF após pagamento confirmado</li>
@@ -983,7 +1004,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={() => playDeepUiPulseSound()}
-                      className="button-primary accent-ring md:mx-auto md:block md:max-w-md"
+                      className="button-cta accent-ring md:mx-auto md:block md:max-w-md"
                     >
                       Obter Relatório Completo + Certificado por apenas R$ 6,00
                     </button>
@@ -1092,7 +1113,7 @@ export default function HomePage() {
                             setCheckoutOpen(false);
                             window.open(pagamentoUrl, '_blank');
                           }}
-                          className="button-primary w-full justify-center bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 text-sm py-4 animate-pulse"
+                          className="button-cta w-full justify-center text-sm py-4 animate-pulse"
                         >
                           ABRIR PAGAMENTO PIX
                         </button>
@@ -1104,7 +1125,7 @@ export default function HomePage() {
                       <button
                         type="submit"
                         disabled={pagando || !email || !nome}
-                        className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
+                        className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                       </button>
@@ -1180,28 +1201,108 @@ export default function HomePage() {
           )}
 
           {fase === "sucesso" && (
-            <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
-              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                <svg className="w-10 h-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-white">Pagamento Confirmado!</h2>
-                <p className="text-muted text-sm max-w-md mx-auto leading-relaxed">
-                  Seu Relatório Detalhado + Certificado PDF foram enviados para o e-mail: <br/>
-                  <span className="font-semibold text-foreground">{email}</span>
-                </p>
-              </div>
-
-              <div className="pt-4">
+            <div className="relative flex w-full max-w-[100vw] flex-col items-center justify-center overflow-x-hidden px-1 py-6 text-center sm:py-10">
+              <div className="sucesso-card-celebrate relative w-full max-w-xl overflow-hidden rounded-3xl border border-border/60 bg-card/50 p-6 shadow-soft backdrop-blur-xl sm:p-8">
                 <button
-                  onClick={() => window.location.href = "/"}
-                  className="button-primary px-8"
+                  type="button"
+                  onClick={() => setSuccessMuted((v) => !v)}
+                  className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card/60 text-xs text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label={successMuted ? "Ativar som" : "Silenciar som"}
                 >
-                  Voltar ao início
+                  {successMuted ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M23 9l-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M17 9l6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M15.5 8.5a4.5 4.5 0 010 7" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M18.5 5.5a8 8 0 010 13" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </button>
+
+                <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
+
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
+                  <svg className="h-10 w-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path className="sucesso-check-path" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <h2 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
+                    Parabéns! Seu Certificado de QI Oficial foi Gerado com Sucesso!
+                  </h2>
+                  <p
+                    className="sucesso-text-reveal mx-auto max-w-md text-sm leading-relaxed text-muted"
+                    style={{ animationDelay: "180ms" }}
+                  >
+                    O seu relatório detalhado e o certificado em PDF foram enviados para{" "}
+                    <span className="inline-block max-w-full break-all font-semibold text-foreground">
+                      {" "}
+                      {email || "(e-mail não informado)"}
+                    </span>
+                    .
+                  </p>
+                </div>
+
+                <div
+                  className="sucesso-text-reveal mt-6 w-full"
+                  style={{ animationDelay: "320ms" }}
+                >
+                  <div className="sucesso-diploma w-full rounded-3xl px-4 py-4 sm:px-6 sm:py-6">
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <div className="w-full min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
+                          Certificado Digital
+                        </p>
+                        <p className="mt-2 w-full max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-white text-[clamp(1.05rem,4.6vw,1.4rem)]">
+                          {nome || "Candidato"}
+                        </p>
+                      </div>
+
+                      <div
+                        className="mt-2 flex items-baseline justify-center gap-2 text-center"
+                        style={{ textShadow: "0 0 16px rgba(52, 211, 153, 0.35)" }}
+                      >
+                        <span className="font-bold uppercase tracking-[0.22em] text-white text-[1.1rem]">
+                          QI estimado:
+                        </span>
+                        <span className="font-bold text-white text-[1.8rem]">
+                          {qiEstimado}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-6 grid gap-2 text-left text-xs text-muted sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">Status</p>
+                        <p className="mt-1 text-emerald-200">Pagamento aprovado</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">Entrega</p>
+                        <p className="mt-1 text-foreground/80">PDF enviado por e-mail</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="sucesso-text-reveal mt-7 flex flex-col items-center justify-center gap-3"
+                  style={{ animationDelay: "460ms" }}
+                >
+                  <button
+                    onClick={handleVoltarAoInicio}
+                    className="sucesso-cta inline-flex w-full max-w-xs items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-transform active:scale-[0.98] sm:w-auto"
+                  >
+                    Voltar ao início
+                  </button>
+                  <p className="max-w-prose text-center text-[11px] text-muted/80">
+                    Obrigado por investir no seu potencial. Seu certificado já pode ser anexado ao currículo e ao LinkedIn.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1236,7 +1337,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between text-[11px]">
                   <span>Perguntas respondidas</span>
                   <span className="font-mono text-xs text-foreground/80">
-                    {respondidas}/{totalPerguntas}
+                    {respondidasParaUi}/{totalPerguntas}
                   </span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-900">
@@ -1273,4 +1374,3 @@ export default function HomePage() {
     </main>
   );
 }
-

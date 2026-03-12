@@ -4,7 +4,13 @@ import { Resend } from "resend";
 import { renderToBuffer } from "@react-pdf/renderer";
 import perguntas from "@/data/perguntas.json";
 import { createPremiumCertificateDocument } from "@/lib/PremiumCertificate";
-import { acquirePaymentDeliveryOnce } from "@/lib/mercadoPagoIdempotency";
+import {
+  acquirePaymentDeliveryOnce,
+  acquirePaymentEmailSendLock,
+  getPaymentEmailSendLockAgeMs,
+  isPaymentProcessed,
+  releasePaymentEmailSendLock
+} from "@/lib/mercadoPagoIdempotency";
 
 export const runtime = "nodejs";
 
@@ -92,11 +98,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
     }
 
+    const alreadyDelivered = await isPaymentProcessed(id);
+    if (alreadyDelivered) {
+      return NextResponse.json({ id, status: "approved", delivered: true, fastTrack: true });
+    }
+
     // Se não foi processado localmente, consulta Mercado Pago
     console.log("[mercadopago/status] Consultando Mercado Pago", { id });
     const mpClient = getMpClient();
     const payment = new Payment(mpClient);
-    const mpPayment = await payment.get({ id });
+    let mpPayment: unknown;
+    try {
+      mpPayment = await payment.get({ id });
+    } catch (err) {
+      console.error("[mercadopago/status] erro ao consultar Mercado Pago", err);
+      return NextResponse.json({ id, status: "pending", delivered: false, error: "Falha ao consultar Mercado Pago." });
+    }
 
     const status = (mpPayment as unknown as { status?: unknown }).status;
     const externalReference = (mpPayment as unknown as { external_reference?: unknown }).external_reference;
@@ -105,6 +122,11 @@ export async function GET(request: Request) {
     console.log("[mercadopago/status] consultado", { id, status, externalReference });
 
     if (status === "approved" && typeof externalReference === "string" && externalReference) {
+      const deliveredNow = await isPaymentProcessed(id);
+      if (deliveredNow) {
+        return NextResponse.json({ id, status: "approved", externalReference, delivered: true, fastTrack: true });
+      }
+
       const store = getPendingStore();
       let pending = store.get(externalReference);
 
@@ -134,9 +156,24 @@ export async function GET(request: Request) {
         paymentId: id
       });
 
+      const STALE_LOCK_MS = 5 * 60 * 1000;
+      let lockAcquired = await acquirePaymentEmailSendLock(id);
+      if (!lockAcquired) {
+        const age = await getPaymentEmailSendLockAgeMs(id);
+        if (typeof age === "number" && age > STALE_LOCK_MS) {
+          await releasePaymentEmailSendLock(id);
+          lockAcquired = await acquirePaymentEmailSendLock(id);
+        }
+      }
+
+      if (!lockAcquired) {
+        return NextResponse.json({ id, status, externalReference, delivered: false, sending: true });
+      }
+
       const resendKey = process.env.RESEND_API_KEY?.trim();
       if (!resendKey) {
         console.error("[mercadopago/status] RESEND_API_KEY não configurada.");
+        await releasePaymentEmailSendLock(id);
         return NextResponse.json({ id, status, externalReference, delivered: false, error: "Resend não configurado." }, { status: 500 });
       }
 
@@ -172,9 +209,9 @@ export async function GET(request: Request) {
       });
 
       const pdfBuffer = await renderToBuffer(doc);
-      const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "relatorio@send.scoremental.com.br";
+      const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "relatorio@scoremental.com.br";
 
-      const { data, error } = await resendClient.emails.send({
+      const payload = {
         from: fromAddress,
         to: pending.email,
         subject: "Seu Relatório Detalhado + Certificado do Teste de QI Profissional",
@@ -195,14 +232,32 @@ export async function GET(request: Request) {
             contentType: "application/pdf"
           }
         ]
+      };
+
+      const { data, error } = await resendClient.emails.send(payload, {
+        idempotencyKey: `mp-approved/${id}`
       });
 
       if (error) {
+        const statusCode = (error as unknown as { statusCode?: unknown }).statusCode;
+        const statusCodeNumber = typeof statusCode === "number" ? statusCode : null;
+        const msg = (error.message ?? "").toLowerCase();
+
         console.error("[mercadopago/status] Resend API error:", {
           message: error.message,
           name: (error as unknown as { name?: string }).name,
-          statusCode: (error as unknown as { statusCode?: unknown }).statusCode
+          statusCode
         });
+        await releasePaymentEmailSendLock(id);
+
+        if (statusCodeNumber === 409 || msg.includes("concurrent_idempotent_requests")) {
+          return NextResponse.json({ id, status, externalReference, delivered: false, sending: true });
+        }
+
+        if (statusCodeNumber === 429 || msg.includes("rate_limit_exceeded")) {
+          return NextResponse.json({ id, status, externalReference, delivered: false, retryAfterSeconds: 20 });
+        }
+
         return NextResponse.json({ id, status, externalReference, delivered: false, error: error.message ?? "Erro ao enviar e-mail." }, { status: 500 });
       }
 
@@ -213,6 +268,8 @@ export async function GET(request: Request) {
       } catch (err) {
         console.error("[mercadopago/status] erro ao marcar idempotência:", err);
       }
+
+      await releasePaymentEmailSendLock(id);
 
       console.log("[mercadopago/status] E-mail enviado. Resend id:", data?.id, "payment:", id);
       return NextResponse.json({ id, status, externalReference, delivered: true });
