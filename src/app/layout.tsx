@@ -28,6 +28,21 @@ export default function RootLayout({
           src="https://sdk.mercadopago.com/js/v2"
           async
         />
+        {/* Google Analytics GA4 */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-43LCE3E2M5"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-43LCE3E2M5');
+            `,
+          }}
+        />
       </body>
     </html>
   );
