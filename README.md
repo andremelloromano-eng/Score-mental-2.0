@@ -109,3 +109,9 @@ Valor: "k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC..."
 - **Mobile:** Testar via túnel (cloudflared/ngrok)
 - **Produção:** Validar webhook e e-mails
 
+## 📊 Analytics
+
+- Vercel Analytics configurado
+- Google Analytics ID: G-43LCE3E2M5
+
+<!-- Deploy final - Score Mental pronto para produção -->
