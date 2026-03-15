@@ -786,7 +786,7 @@ export default function HomePage() {
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
               </div>
-              <div className="mt-2 text-center" style={{ whiteSpace: 'nowrap', fontSize: '10px', display: 'flex', justifyContent: 'center', gap: '5px', letterSpacing: '-0.2px' }}>
+              <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
                 🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
               </div>
             </div>
@@ -1017,7 +1017,7 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div className="mt-2 text-center" style={{ whiteSpace: 'nowrap', fontSize: '10px', display: 'flex', justifyContent: 'center', gap: '5px', letterSpacing: '-0.2px' }}>
+                <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
                   🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
                 </div>
               </div>
@@ -1136,7 +1136,7 @@ export default function HomePage() {
                         >
                           {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                         </button>
-                        <div className="mt-2 text-center text-[11px] text-slate-300">
+                        <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
                           🔒 Ambiente Seguro | ⚡ Pix com Aprovação Instantânea
                         </div>
                         <div className="text-center">
