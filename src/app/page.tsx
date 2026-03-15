@@ -786,6 +786,9 @@ export default function HomePage() {
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
               </div>
+              <div className="mt-2 text-center text-[10px] text-muted/70">
+                🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
+              </div>
             </div>
           )}
 
@@ -1009,10 +1012,13 @@ export default function HomePage() {
                       Obter Relatório Completo + Certificado por apenas R$ 6,00
                     </button>
                   </Dialog.Trigger>
-                  <p className="text-[11px] text-muted">
+                  <p className="text-[11px] text-muted text-center max-w-[400px] mx-auto">
                     O relatório completo e o certificado em PDF serão enviados ao
                     e-mail informado após a confirmação do pagamento.
                   </p>
+                </div>
+                <div className="mt-2 text-center text-[12px] text-slate-400">
+                  🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
                 </div>
               </div>
 
@@ -1122,18 +1128,27 @@ export default function HomePage() {
                         </p>
                       </div>
                     ) : (
-                      <button
-                        type="submit"
-                        disabled={pagando || !email || !nome}
-                        className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
-                      </button>
+                      <>
+                        <button
+                          type="submit"
+                          disabled={pagando || !email || !nome}
+                          className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
+                        </button>
+                        <div className="mt-2 text-center text-[11px] text-slate-300">
+                          🔒 Ambiente Seguro | ⚡ Pix com Aprovação Instantânea
+                        </div>
+                        <div className="text-center">
+                          <div style={{ display: 'inline-block', backgroundColor: '#009EE3', color: 'white', padding: '4px 12px', borderRadius: '4px', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: '13px', marginTop: '15px' }}>
+                            MERCADO PAGO
+                          </div>
+                        </div>
+                      </>
                     )}
 
-                    <div className="mt-1 flex items-center justify-between text-[10px] text-muted">
-                      <span>Transação segura e confidencial.</span>
-                      <span>Dados tratados com criptografia.</span>
+                    <div className="mt-2 text-center text-[9px] text-muted/60">
+                      Transação segura e confidencial • Dados tratados com criptografia
                     </div>
                   </form>
                 </Dialog.Content>
