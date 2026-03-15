@@ -1017,7 +1017,7 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
+                <div style={{ display: 'flex !important', justifyContent: 'center !important', whiteSpace: 'nowrap !important', fontSize: '10px !important', gap: '6px !important', width: '100% !important', margin: '10px auto !important' }}>
                   🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
                 </div>
               </div>
