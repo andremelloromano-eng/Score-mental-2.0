@@ -786,7 +786,7 @@ export default function HomePage() {
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
               </div>
-              <div className="mt-2 text-center text-[10px] text-muted/70">
+              <div className="mt-2 text-center" style={{ whiteSpace: 'nowrap', fontSize: '10px', display: 'flex', justifyContent: 'center', gap: '5px', letterSpacing: '-0.2px' }}>
                 🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
               </div>
             </div>
