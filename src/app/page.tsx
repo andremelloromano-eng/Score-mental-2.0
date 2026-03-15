@@ -1017,9 +1017,6 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div style={{ display: 'block !important', whiteSpace: 'nowrap !important', textAlign: 'center' as any, fontSize: '2.5vw !important', width: '100% !important', overflow: 'visible !important', margin: '10px 0 !important', fontFamily: 'sans-serif !important' }}>
-                  🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail
-                </div>
               </div>
 
               <Dialog.Portal>
@@ -1136,9 +1133,6 @@ export default function HomePage() {
                         >
                           {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                         </button>
-                        <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
-                          🔒 Ambiente Seguro | ⚡ Pix com Aprovação Instantânea
-                        </div>
                         <div className="text-center">
                           <div style={{ display: 'inline-block', backgroundColor: '#009EE3', color: 'white', padding: '4px 12px', borderRadius: '4px', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: '13px', marginTop: '15px', margin: '15px auto 0 auto' }}>
                             MERCADO PAGO
