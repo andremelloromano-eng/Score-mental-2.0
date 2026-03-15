@@ -1017,8 +1017,8 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div style={{ display: 'flex !important', justifyContent: 'center !important', whiteSpace: 'nowrap !important', fontSize: '10px !important', gap: '6px !important', width: '100% !important', margin: '10px auto !important' }}>
-                  🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
+                <div style={{ display: 'block !important', textAlign: 'center' as any, width: '100% !important', fontSize: '9px !important', whiteSpace: 'nowrap !important', margin: '12px auto !important' }}>
+                  🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail
                 </div>
               </div>
 
@@ -1140,7 +1140,7 @@ export default function HomePage() {
                           🔒 Ambiente Seguro | ⚡ Pix com Aprovação Instantânea
                         </div>
                         <div className="text-center">
-                          <div style={{ display: 'inline-block', backgroundColor: '#009EE3', color: 'white', padding: '4px 12px', borderRadius: '4px', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: '13px', marginTop: '15px' }}>
+                          <div style={{ display: 'inline-block', backgroundColor: '#009EE3', color: 'white', padding: '4px 12px', borderRadius: '4px', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: '13px', marginTop: '15px', margin: '15px auto 0 auto' }}>
                             MERCADO PAGO
                           </div>
                         </div>
