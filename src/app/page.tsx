@@ -1017,7 +1017,7 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div style={{ display: 'block !important', textAlign: 'center' as any, width: '100% !important', fontSize: '9px !important', whiteSpace: 'nowrap !important', margin: '12px auto !important' }}>
+                <div style={{ display: 'block !important', whiteSpace: 'nowrap !important', textAlign: 'center' as any, fontSize: '2.5vw !important', width: '100% !important', overflow: 'visible !important', margin: '10px 0 !important', fontFamily: 'sans-serif !important' }}>
                   🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail
                 </div>
               </div>
