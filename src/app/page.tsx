@@ -1017,7 +1017,7 @@ export default function HomePage() {
                     e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
-                <div className="mt-2 text-center text-[12px] text-slate-400">
+                <div className="mt-2 text-center" style={{ whiteSpace: 'nowrap', fontSize: '10px', display: 'flex', justifyContent: 'center', gap: '5px', letterSpacing: '-0.2px' }}>
                   🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
                 </div>
               </div>
