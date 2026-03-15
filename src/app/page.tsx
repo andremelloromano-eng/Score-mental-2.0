@@ -1006,7 +1006,12 @@ export default function HomePage() {
                   <Dialog.Trigger asChild>
                     <button
                       type="button"
-                      onClick={() => playDeepUiPulseSound()}
+                      onClick={() => {
+                        playDeepUiPulseSound();
+                        if (typeof window !== 'undefined' && (window as any).ttq) {
+                          (window as any).ttq.track('InitiateCheckout');
+                        }
+                      }}
                       className="button-cta accent-ring md:mx-auto md:block md:max-w-md"
                     >
                       Obter Relatório Completo + Certificado por apenas R$ 6,00
@@ -1130,6 +1135,11 @@ export default function HomePage() {
                           type="submit"
                           disabled={pagando || !email || !nome}
                           className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => {
+                            if (typeof window !== 'undefined' && (window as any).ttq) {
+                              (window as any).ttq.track('InitiateCheckout');
+                            }
+                          }}
                         >
                           {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
                         </button>
