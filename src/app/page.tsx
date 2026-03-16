@@ -1,5 +1,6 @@
 "use client";
 
+import "@/app/globals.css";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -37,21 +38,18 @@ function TiltCard({
   const ref = useRef<HTMLDivElement>(null);
   const [rotate, setRotate] = useState({ x: 0, y: 0 });
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const x = (e.clientX - centerX) / (rect.width / 2);
-      const y = (e.clientY - centerY) / (rect.height / 2);
-      setRotate({
-        x: Math.max(-1, Math.min(1, -y)) * TILT_MAX,
-        y: Math.max(-1, Math.min(1, x)) * TILT_MAX,
-      });
-    },
-    []
-  );
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const x = (e.clientX - centerX) / (rect.width / 2);
+    const y = (e.clientY - centerY) / (rect.height / 2);
+    setRotate({
+      x: Math.max(-1, Math.min(1, -y)) * TILT_MAX,
+      y: Math.max(-1, Math.min(1, x)) * TILT_MAX,
+    });
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     setRotate({ x: 0, y: 0 });
@@ -150,7 +148,12 @@ type Pergunta = {
   opcoes: Opcao[];
 };
 
-type Fase = "intro" | "quiz" | "resultado-pronto" | "aguardando-pagamento" | "sucesso";
+type Fase =
+  | "intro"
+  | "quiz"
+  | "resultado-pronto"
+  | "aguardando-pagamento"
+  | "sucesso";
 
 const perguntasTyped = perguntas as Pergunta[];
 
@@ -174,9 +177,13 @@ export default function HomePage() {
   const [pixAberto, setPixAberto] = useState(false);
   const [tempoRestante, setTempoRestante] = useState(SEGUNDOS_POR_QUESTAO);
   const [mostrarMensagemMetade, setMostrarMensagemMetade] = useState(false);
-  const [proximaIndexPendente, setProximaIndexPendente] = useState<number | null>(null);
+  const [proximaIndexPendente, setProximaIndexPendente] = useState<
+    number | null
+  >(null);
   const [imagemFalhou, setImagemFalhou] = useState(false);
-  const [opcaoSelecionadaAtual, setOpcaoSelecionadaAtual] = useState<string | null>(null);
+  const [opcaoSelecionadaAtual, setOpcaoSelecionadaAtual] = useState<
+    string | null
+  >(null);
   const [pagamentoUrl, setPagamentoUrl] = useState<string | null>(null);
   const [tempoExpiracao, setTempoExpiracao] = useState(600); // 10 minutos em segundos
   const intervaloRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -186,6 +193,12 @@ export default function HomePage() {
   const paymentSuccessSoundPlayedRef = useRef(false);
   const voltarInicioRef = useRef(false);
   const [successMuted, setSuccessMuted] = useState(false);
+  const [generatedCertificates, setGeneratedCertificates] = useState(() => {
+    const now = new Date();
+    const horas = now.getHours();
+    const minutos = now.getMinutes();
+    return Math.floor(150 + horas * 12 + minutos / 5);
+  });
 
   // Detecção de mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -193,29 +206,58 @@ export default function HomePage() {
   // Detectar se é mobile
   useEffect(() => {
     const checkMobile = () => {
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                            window.innerWidth < 768;
+      const isMobileDevice =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent,
+        ) || window.innerWidth < 768;
       setIsMobile(isMobileDevice);
     };
-    
+
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const liveTimeout = setTimeout(() => {
+      setGeneratedCertificates((prev) => prev + 1);
+    }, 5000);
+
+    const interval = setInterval(() => {
+      setGeneratedCertificates((prev) => prev + 1);
+    }, Math.random() * 15000 + 45000);
+
+    return () => {
+      clearTimeout(liveTimeout);
+      clearInterval(interval);
+    };
   }, []);
 
   // use-sound — experiência imersiva e moderna; volumes 0.05/0.08 para elegância.
-  const [playHapticTap, { stop: stopHapticTap }] = useSound("/sounds/haptic-tap.wav", { volume: 0.05 });
+  const [playHapticTap, { stop: stopHapticTap }] = useSound(
+    "/sounds/haptic-tap.wav",
+    { volume: 0.05 },
+  );
   const [playSuccess] = useSound("/sounds/success.wav", { volume: 0.5 });
   const [playShimmer] = useSound("/sounds/shimmer.wav", { volume: 0.1 });
   const [playCardPulsar] = useSound("/sounds/card-pulsar.wav", { volume: 0.5 });
   const [playDeepUiPulse, { stop: stopDeepUiPulse }] = useSound(
     "/sounds/deep-ui-pulse.wav",
-    { volume: 0.08 }
+    { volume: 0.08 },
   );
-  const [playAmbientSwell] = useSound("/sounds/ambient-swell.wav", { volume: 0.08 });
-  const [playAmbientAiryNotification] = useSound("/sounds/ambient-airy-notification.wav", { volume: 0.05 });
-  const [playSecureConfirmation] = useSound("/sounds/secure-confirmation.wav", { volume: 0.08 });
-  const [playTransitionSlide] = useSound("/sounds/transition-slide.wav", { volume: 0.4 });
+  const [playAmbientSwell] = useSound("/sounds/ambient-swell.wav", {
+    volume: 0.08,
+  });
+  const [playAmbientAiryNotification] = useSound(
+    "/sounds/ambient-airy-notification.wav",
+    { volume: 0.05 },
+  );
+  const [playSecureConfirmation] = useSound("/sounds/secure-confirmation.wav", {
+    volume: 0.08,
+  });
+  const [playTransitionSlide] = useSound("/sounds/transition-slide.wav", {
+    volume: 0.4,
+  });
 
   // Safari: desbloquear áudio no primeiro gesto (volume 0, sem confundir com sons da página).
   useEffect(() => {
@@ -236,7 +278,10 @@ export default function HomePage() {
   }, [playDeepUiPulse, stopDeepUiPulse]);
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? window.localStorage.getItem("successMuted") : null;
+    const stored =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("successMuted")
+        : null;
     if (stored === "1") setSuccessMuted(true);
   }, []);
 
@@ -249,14 +294,26 @@ export default function HomePage() {
   const perguntaAtual = perguntasTyped[indiceAtual];
   const respondidas = Object.keys(respostas).length;
   const respondidasParaUi =
-    fase === "resultado-pronto" || fase === "aguardando-pagamento" || fase === "sucesso"
+    fase === "resultado-pronto" ||
+    fase === "aguardando-pagamento" ||
+    fase === "sucesso"
       ? totalPerguntas
       : Math.min(
           totalPerguntas,
-          respondidas + (fase === "quiz" && opcaoSelecionadaAtual && perguntaAtual && !respostas[perguntaAtual.id] ? 1 : 0)
+          respondidas +
+            (fase === "quiz" &&
+            opcaoSelecionadaAtual &&
+            perguntaAtual &&
+            !respostas[perguntaAtual.id]
+              ? 1
+              : 0),
         );
-  const progresso = totalPerguntas > 0 ? (respondidasParaUi / totalPerguntas) * 100 : 0;
-  const perguntaNumeroParaUi = fase === "quiz" ? Math.min(totalPerguntas, indiceAtual + 1) : totalPerguntas;
+  const progresso =
+    totalPerguntas > 0 ? (respondidasParaUi / totalPerguntas) * 100 : 0;
+  const perguntaNumeroParaUi =
+    fase === "quiz"
+      ? Math.min(totalPerguntas, indiceAtual + 1)
+      : totalPerguntas;
 
   const acertos = perguntasTyped.reduce((acc, p) => {
     const resp = respostas[p.id];
@@ -265,7 +322,26 @@ export default function HomePage() {
     return resp === correta ? acc + 1 : acc;
   }, 0);
 
-  const qiEstimado = Math.round(85 + (acertos / Math.max(totalPerguntas, 1)) * 35);
+  const qiEstimado = Math.round(
+    85 + (acertos / Math.max(totalPerguntas, 1)) * 35,
+  );
+
+  const CertificatesCounter = () => (
+    <div className="w-full flex items-center justify-center gap-2 mt-4 max-w-[90%] mx-auto">
+      <span className="text-lg md:text-xl font-bold text-cyan-400">🔥</span>
+      <motion.span
+        key={generatedCertificates}
+        initial={{ scale: 1.2, opacity: 0.8 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="text-lg md:text-xl font-bold text-cyan-400"
+      >
+        {generatedCertificates}
+      </motion.span>
+      <span className="text-xs md:text-sm font-normal text-gray-300 text-center">
+        certificados gerados hoje
+      </span>
+    </div>
+  );
 
   useEffect(() => {
     if (!animando) return;
@@ -322,7 +398,7 @@ export default function HomePage() {
       }
       setIndiceAtual(proximaIndex);
     },
-    [totalPerguntas]
+    [totalPerguntas],
   );
 
   function irParaProximaPergunta(proximaIndex: number) {
@@ -365,7 +441,7 @@ export default function HomePage() {
     if (!opcaoSelecionadaAtual) return;
     setRespostas((prev) => ({
       ...prev,
-      [perguntaAtual.id]: opcaoSelecionadaAtual
+      [perguntaAtual.id]: opcaoSelecionadaAtual,
     }));
     playDeepUiPulseSound();
     setOpcaoSelecionadaAtual(null);
@@ -384,10 +460,15 @@ export default function HomePage() {
   }, [successMuted]);
 
   const handleTempoEsgotado = useCallback(() => {
-    if (fase === "quiz" && perguntaAtual && opcaoSelecionadaAtual && !respostas[perguntaAtual.id]) {
+    if (
+      fase === "quiz" &&
+      perguntaAtual &&
+      opcaoSelecionadaAtual &&
+      !respostas[perguntaAtual.id]
+    ) {
       setRespostas((prev) => ({
         ...prev,
-        [perguntaAtual.id]: opcaoSelecionadaAtual
+        [perguntaAtual.id]: opcaoSelecionadaAtual,
       }));
     }
     setOpcaoSelecionadaAtual(null);
@@ -450,7 +531,7 @@ export default function HomePage() {
       const res = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email,
@@ -458,13 +539,23 @@ export default function HomePage() {
           respostas,
           acertos,
           totalPerguntas,
-          qiEstimado
-        })
+          qiEstimado,
+        }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; url?: string; paymentId?: string | number };
-      console.log("📦 Resposta API checkout:", { ok: res.ok, status: res.status, data });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        url?: string;
+        paymentId?: string | number;
+      };
+      console.log("📦 Resposta API checkout:", {
+        ok: res.ok,
+        status: res.status,
+        data,
+      });
       if (!res.ok) {
-        setErroEnvio(data.error || "Falha ao iniciar o checkout. Tente novamente.");
+        setErroEnvio(
+          data.error || "Falha ao iniciar o checkout. Tente novamente.",
+        );
         setPagando(false);
         return;
       }
@@ -474,7 +565,7 @@ export default function HomePage() {
 
       if (data.url) {
         console.log("🔗 URL de pagamento gerada:", data.url);
-        
+
         // FLUXO DE CLIQUE ÚNICO: Salva a URL mas NÃO abre automaticamente para evitar bloqueio do Safari
         setPagamentoUrl(data.url);
         setPixAberto(true);
@@ -506,7 +597,8 @@ export default function HomePage() {
 
   // POLLING E MONITORAMENTO: Para todos quando estiver em aguardando-pagamento
   useEffect(() => {
-    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado)
+      return;
 
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -517,11 +609,18 @@ export default function HomePage() {
     console.log("🔍 Iniciando monitoramento para paymentId:", pid);
     pollingRef.current = setInterval(async () => {
       try {
-        const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(pid)}`);
-        const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
+        const statusRes = await fetch(
+          `/api/mercadopago/status?id=${encodeURIComponent(pid)}`,
+        );
+        const statusData = (await statusRes.json().catch(() => ({}))) as {
+          status?: string;
+          error?: string;
+        };
         console.log("🔍 Status polling:", { pid, status: statusData?.status });
         if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado! Limpando estado e mostrando sucesso");
+          console.log(
+            "✅ Pagamento aprovado! Limpando estado e mostrando sucesso",
+          );
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -561,7 +660,8 @@ export default function HomePage() {
 
   // CRONÔMETRO DE EXPIRAÇÃO: Para todos quando estiver em aguardando-pagamento
   useEffect(() => {
-    if (fase !== "aguardando-pagamento" || !pixAberto || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !pixAberto || checkoutAprovado)
+      return;
 
     const intervalo = setInterval(() => {
       setTempoExpiracao((prev) => {
@@ -584,24 +684,35 @@ export default function HomePage() {
   const formatarTempo = (segundos: number) => {
     const mins = Math.floor(segundos / 60);
     const secs = segundos % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // MONITORAMENTO EM SEGUNDO PLANO: Para todos - verifica quando usuário volta da aba
   useEffect(() => {
-    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado) return;
+    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado)
+      return;
 
     // VERIFICAÇÃO IMEDIATA quando usuário volta para nossa aba
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && paymentId) {
-        console.log("📱 VISIBILIDADE alterada - Verificação imediata disparada");
-        
+      if (document.visibilityState === "visible" && paymentId) {
+        console.log(
+          "📱 VISIBILIDADE alterada - Verificação imediata disparada",
+        );
+
         try {
           // Usar caminho relativo para garantir que funcione em qualquer domínio (dev ou prod)
-          const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
-          const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
-          console.log("📱 Status na verificação imediata:", { paymentId, status: statusData?.status });
-          
+          const statusRes = await fetch(
+            `/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`,
+          );
+          const statusData = (await statusRes.json().catch(() => ({}))) as {
+            status?: string;
+            error?: string;
+          };
+          console.log("📱 Status na verificação imediata:", {
+            paymentId,
+            status: statusData?.status,
+          });
+
           if (statusData?.status === "approved") {
             console.log("✅ Pagamento aprovado na verificação imediata!");
             if (pollingRef.current) {
@@ -623,41 +734,51 @@ export default function HomePage() {
     };
 
     // Adicionar listeners para garantir captura em todos os navegadores (especialmente Safari Mobile)
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
-    window.addEventListener('pageshow', handleVisibilityChange);
-    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+    window.addEventListener("pageshow", handleVisibilityChange);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
-      window.removeEventListener('pageshow', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+      window.removeEventListener("pageshow", handleVisibilityChange);
     };
   }, [fase, paymentId, checkoutAprovado]);
 
   // Função de verificação manual (botão)
   const handleManualCheck = async () => {
     if (!paymentId) return;
-    
+
     console.log("🔘 Verificação manual disparada pelo usuário");
     try {
-      const statusRes = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
-      const statusData = (await statusRes.json().catch(() => ({}))) as { status?: string; error?: string };
-      console.log("🔘 Status manual:", { paymentId, status: statusData?.status });
-      
+      const statusRes = await fetch(
+        `/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`,
+      );
+      const statusData = (await statusRes.json().catch(() => ({}))) as {
+        status?: string;
+        error?: string;
+      };
+      console.log("🔘 Status manual:", {
+        paymentId,
+        status: statusData?.status,
+      });
+
       if (statusData?.status === "approved") {
-          console.log("✅ Pagamento aprovado na verificação manual! Exibindo sucesso");
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-          setCheckoutAprovado(true);
-          setFase("sucesso");
-          setPaymentId(null);
-          setErroEnvio(null);
-          setPixAberto(false);
-          setPagamentoUrl(null);
-          setTempoExpiracao(600);
-        } else {
+        console.log(
+          "✅ Pagamento aprovado na verificação manual! Exibindo sucesso",
+        );
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setCheckoutAprovado(true);
+        setFase("sucesso");
+        setPaymentId(null);
+        setErroEnvio(null);
+        setPixAberto(false);
+        setPagamentoUrl(null);
+        setTempoExpiracao(600);
+      } else {
         // Feedback visual de que ainda não foi aprovado
         console.log("⏳ Ainda não aprovado na verificação manual");
       }
@@ -667,81 +788,87 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-slate-900 px-4 py-10 text-white">
       <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 md:flex-row">
         <div className="pointer-events-none absolute inset-0 -z-10 blur-3xl">
           <div className="mx-auto h-full max-w-3xl bg-gradient-to-br from-accent/20 via-transparent to-indigo-900/10 opacity-70" />
         </div>
 
-        <section className="glass-card flex-1 p-6 md:p-8">
+        <section className="glass-card flex-1 p-6 md:p-8 border border-white/10 bg-slate-900/50 backdrop-blur-xl">
           {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
-          <header className="mb-6 flex items-start justify-between gap-4">
-            <div className="space-y-3">
-              <span className="pill">Teste de QI Profissional</span>
-              <div className="overflow-visible min-w-0">
-                <HeroTitleAnimated onWordHover={playShimmer} />
-                <p className="mt-2 max-w-lg text-xs text-muted md:text-sm">
-                  Um teste moderno, rápido e orientado para o mercado, com
-                  relatório detalhado e certificado em PDF enviado diretamente
-                  para o seu e-mail.
-                </p>
+            <header className="mb-6 flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <span className="pill">Teste de QI Profissional</span>
+                <div className="overflow-visible min-w-0">
+                  <HeroTitleAnimated onWordHover={playShimmer} />
+                  <p className="mt-2 max-w-lg text-xs text-muted md:text-sm">
+                    Um teste moderno, rápido e orientado para o mercado, com
+                    relatório detalhado e certificado em PDF enviado diretamente
+                    para o seu e-mail.
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="hidden text-right text-[11px] text-muted md:block">
-              <p className="font-medium text-foreground/80">Avaliação segura</p>
-              <p>Resultados confidenciais e criptografados</p>
-            </div>
-          </header>
+              <div className="hidden text-right text-[11px] text-muted md:block">
+                <p className="font-medium text-foreground/80">
+                  Avaliação segura
+                </p>
+                <p>Resultados confidenciais e criptografados</p>
+              </div>
+            </header>
           )}
 
-          {fase !== "intro" && fase !== "aguardando-pagamento" && fase !== "sucesso" && (
-            <div className="mb-6 space-y-3">
-              <div className="flex items-center justify-between text-[11px] text-muted">
-                <span>
-                  Pergunta {perguntaNumeroParaUi}{" "}
-                  de {totalPerguntas}
-                </span>
-                <span>
-                  Progresso: {Math.round(progresso)}%
-                </span>
-              </div>
-              <Progress.Root
-                className="relative h-2 w-full overflow-hidden rounded-full bg-slate-900/80"
-                value={progresso}
-              >
-                <Progress.Indicator
-                  className="h-full w-full origin-left bg-gradient-to-r from-accent via-indigo-500 to-sky-400 transition-transform duration-300"
-                  style={{ transform: `translateX(-${100 - progresso}%)` }}
-                />
-                {/* Camada de brilho (glow) separada, só sobre a parte preenchida */}
-                <div
-                  className="absolute inset-y-0 left-0 overflow-hidden rounded-full pointer-events-none"
-                  style={{ width: `${Math.max(progresso, 2)}%` }}
-                >
-                  <motion.div
-                    aria-hidden
-                    className="absolute inset-y-0 w-[100px] rounded-full"
-                    style={{
-                      left: 0,
-                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 20%, rgba(96,165,250,0.95) 50%, rgba(255,255,255,0.6) 80%, transparent 100%)",
-                    }}
-                    animate={{ x: [-100, 500] }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      repeatType: "loop",
-                      ease: "easeInOut",
-                    }}
-                  />
+          {fase !== "intro" &&
+            fase !== "aguardando-pagamento" &&
+            fase !== "sucesso" && (
+              <div className="mb-6 space-y-3">
+                <div className="flex items-center justify-between text-[11px] text-muted">
+                  <span>
+                    Pergunta {perguntaNumeroParaUi} de {totalPerguntas}
+                  </span>
+                  <span>Progresso: {Math.round(progresso)}%</span>
                 </div>
-              </Progress.Root>
-            </div>
-          )}
+                <Progress.Root
+                  className="relative h-2 w-full overflow-hidden rounded-full bg-slate-900/80"
+                  value={progresso}
+                >
+                  <Progress.Indicator
+                    className="h-full w-full origin-left bg-gradient-to-r from-accent via-indigo-500 to-sky-400 transition-transform duration-300"
+                    style={{ transform: `translateX(-${100 - progresso}%)` }}
+                  />
+                  {/* Camada de brilho (glow) separada, só sobre a parte preenchida */}
+                  <div
+                    className="absolute inset-y-0 left-0 overflow-hidden rounded-full pointer-events-none"
+                    style={{ width: `${Math.max(progresso, 2)}%` }}
+                  >
+                    <motion.div
+                      aria-hidden
+                      className="absolute inset-y-0 w-[100px] rounded-full"
+                      style={{
+                        left: 0,
+                        background:
+                          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 20%, rgba(96,165,250,0.95) 50%, rgba(255,255,255,0.6) 80%, transparent 100%)",
+                      }}
+                      animate={{ x: [-100, 500] }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        ease: "easeInOut",
+                      }}
+                    />
+                  </div>
+                </Progress.Root>
+              </div>
+            )}
 
           {fase === "intro" && (
             <div className="mt-4 space-y-6">
               <div className="relative grid grid-cols-3 gap-1.5 text-[11px] md:gap-3 md:text-sm">
-                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
+                <TiltCard
+                  className="min-h-[60px] md:min-h-[120px]"
+                  variant="neon-blue"
+                  onMouseEnterSound={playCardPulsar}
+                >
                   <p className="card-title-shine">
                     Foco em contexto profissional
                   </p>
@@ -750,19 +877,23 @@ export default function HomePage() {
                     precisão em ambiente corporativo.
                   </p>
                 </TiltCard>
-                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
-                  <p className="card-title-shine">
-                    Relatório detalhado
-                  </p>
+                <TiltCard
+                  className="min-h-[60px] md:min-h-[120px]"
+                  variant="neon-blue"
+                  onMouseEnterSound={playCardPulsar}
+                >
+                  <p className="card-title-shine">Relatório detalhado</p>
                   <p className="mt-0.5 md:mt-1 text-gray-400">
                     Perfil cognitivo, pontos fortes e oportunidades de
                     desenvolvimento enviados em PDF.
                   </p>
                 </TiltCard>
-                <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue" onMouseEnterSound={playCardPulsar}>
-                  <p className="card-title-shine">
-                    Certificado exclusivo
-                  </p>
+                <TiltCard
+                  className="min-h-[60px] md:min-h-[120px]"
+                  variant="neon-blue"
+                  onMouseEnterSound={playCardPulsar}
+                >
+                  <p className="card-title-shine">Certificado exclusivo</p>
                   <p className="mt-0.5 md:mt-1 text-gray-400">
                     Certificado digital com seu resultado para anexar ao
                     currículo ou LinkedIn.
@@ -771,14 +902,15 @@ export default function HomePage() {
                 <ParticlesOverlay />
               </div>
 
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center md:mt-0 md:flex-row md:flex-wrap md:items-start md:justify-start md:text-left">
+              <div className="mt-8 flex flex-col items-center justify-center w-full gap-4 text-center">
+                <CertificatesCounter />
                 <button
                   type="button"
                   onClick={() => {
                     playAmbientSwell();
                     handleIniciar();
                   }}
-                  className="button-cta accent-ring"
+                  className="button-cta accent-ring w-full max-w-sm"
                 >
                   Iniciar teste agora
                 </button>
@@ -786,8 +918,21 @@ export default function HomePage() {
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
               </div>
-              <div style={{ display: 'flex !important', flexWrap: 'nowrap' as any, justifyContent: 'center !important', alignItems: 'center !important', whiteSpace: 'nowrap !important', fontSize: '9px !important', gap: '4px !important', marginTop: '10px !important', width: '100% !important' }}>
-                🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$ 6,00
+              <div
+                style={{
+                  display: "flex !important",
+                  flexWrap: "nowrap" as any,
+                  justifyContent: "center !important",
+                  alignItems: "center !important",
+                  whiteSpace: "nowrap !important",
+                  fontSize: "9px !important",
+                  gap: "4px !important",
+                  marginTop: "10px !important",
+                  width: "100% !important",
+                }}
+              >
+                🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$
+                6,00
               </div>
             </div>
           )}
@@ -795,7 +940,9 @@ export default function HomePage() {
           {fase === "quiz" && (
             <div
               className={`mt-2 space-y-5 transition-all duration-250 ${
-                animando ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"
+                animando
+                  ? "translate-y-2 opacity-0"
+                  : "translate-y-0 opacity-100"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted">
@@ -813,17 +960,23 @@ export default function HomePage() {
                       tempoRestante > 30
                         ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
                         : tempoRestante > 15
-                        ? "border-amber-500/50 bg-amber-500/10 text-amber-300/95"
-                        : "border-red-400/40 bg-red-500/10 text-red-300/90"
+                          ? "border-amber-500/50 bg-amber-500/10 text-amber-300/95"
+                          : "border-red-400/40 bg-red-500/10 text-red-300/90"
                     }`}
                     aria-label="Tempo restante para esta questão"
                   >
                     <motion.span
                       className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80"
-                      animate={{ opacity: tempoRestante <= 15 ? [0.7, 1, 0.7] : 0.8 }}
-                      transition={{ duration: 1.5, repeat: tempoRestante <= 15 ? Infinity : 0 }}
+                      animate={{
+                        opacity: tempoRestante <= 15 ? [0.7, 1, 0.7] : 0.8,
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: tempoRestante <= 15 ? Infinity : 0,
+                      }}
                     />
-                    {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, "0")}
+                    {Math.floor(tempoRestante / 60)}:
+                    {(tempoRestante % 60).toString().padStart(2, "0")}
                   </motion.span>
                   <span>
                     ID da questão:{" "}
@@ -834,16 +987,31 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {(perguntaAtual.imagem != null && perguntaAtual.imagem !== "") && (
+              {perguntaAtual.imagem != null && perguntaAtual.imagem !== "" && (
                 <div className="overflow-hidden rounded-2xl border border-border/60 bg-slate-950/60">
                   <div className="relative flex min-h-[200px] w-full items-center justify-center bg-slate-950/80">
                     {imagemFalhou ? (
                       <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                        <svg className="h-24 w-24 text-muted/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="h-24 w-24 text-muted/50"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
-                        <p className="text-sm text-muted">Imagem da questão não disponível</p>
-                        <p className="text-xs text-muted/80">Adicione o arquivo em public/test-qi-imagens</p>
+                        <p className="text-sm text-muted">
+                          Imagem da questão não disponível
+                        </p>
+                        <p className="text-xs text-muted/80">
+                          Adicione o arquivo em public/test-qi-imagens
+                        </p>
                       </div>
                     ) : (
                       <img
@@ -856,7 +1024,8 @@ export default function HomePage() {
                     )}
                   </div>
                   <p className="border-t border-border/50 bg-slate-950/40 px-3 py-2 text-center text-[11px] text-muted">
-                    Analise a imagem acima e escolha a opção que considera correta.
+                    Analise a imagem acima e escolha a opção que considera
+                    correta.
                   </p>
                 </div>
               )}
@@ -868,7 +1037,8 @@ export default function HomePage() {
               <div className="relative grid gap-3">
                 {perguntaAtual.opcoes.map((opcao) => {
                   const selecionada =
-                    respostas[perguntaAtual.id] === opcao.id || opcaoSelecionadaAtual === opcao.id;
+                    respostas[perguntaAtual.id] === opcao.id ||
+                    opcaoSelecionadaAtual === opcao.id;
                   return (
                     <button
                       key={opcao.id}
@@ -914,7 +1084,10 @@ export default function HomePage() {
             </div>
           )}
 
-          <Dialog.Root open={mostrarMensagemMetade} onOpenChange={(open) => !open && handleFecharMensagemMetade()}>
+          <Dialog.Root
+            open={mostrarMensagemMetade}
+            onOpenChange={(open) => !open && handleFecharMensagemMetade()}
+          >
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
               <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
@@ -927,7 +1100,9 @@ export default function HomePage() {
                     Você já atingiu 50% do teste
                   </h3>
                   <p className="text-sm text-muted">
-                    Você já está na média de aproximadamente 80% das pessoas que fizeram este teste. Continue assim para ver seu resultado completo e receber o certificado.
+                    Você já está na média de aproximadamente 80% das pessoas que
+                    fizeram este teste. Continue assim para ver seu resultado
+                    completo e receber o certificado.
                   </p>
                   <button
                     type="button"
@@ -948,7 +1123,9 @@ export default function HomePage() {
             <Dialog.Root open={checkoutOpen} onOpenChange={setCheckoutOpen}>
               <div
                 className={`mt-4 space-y-6 transition-all duration-250 ${
-                  animando ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"
+                  animando
+                    ? "translate-y-2 opacity-0"
+                    : "translate-y-0 opacity-100"
                 }`}
               >
                 <div className="space-y-3">
@@ -969,57 +1146,71 @@ export default function HomePage() {
                 </div>
 
                 <div className="relative grid grid-cols-3 gap-1.5 text-[11px] md:gap-4 md:text-sm">
-                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
-                    <p className="card-title-shine">
-                      O que você recebe
-                    </p>
+                  <TiltCard
+                    className="min-h-[60px] md:min-h-[120px]"
+                    variant="neon-blue"
+                  >
+                    <p className="card-title-shine">O que você recebe</p>
                     <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• QI estimado com explicação clara</li>
                       <li>• Perfil cognitivo profissional</li>
                       <li>• Pontos fortes e recomendações</li>
                     </ul>
                   </TiltCard>
-                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
-                    <p className="card-title-shine">
-                      Certificado em PDF
-                    </p>
+                  <TiltCard
+                    className="min-h-[60px] md:min-h-[120px]"
+                    variant="neon-blue"
+                  >
+                    <p className="card-title-shine">Certificado em PDF</p>
                     <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• Assinatura digital verificada</li>
                       <li>• Ideal para currículo e LinkedIn</li>
                       <li>• Envio automático por e-mail</li>
                     </ul>
                   </TiltCard>
-                  <TiltCard className="min-h-[60px] md:min-h-[120px]" variant="neon-blue">
-                    <p className="card-title-shine">
-                      Pagamento seguro
-                    </p>
+                  <TiltCard
+                    className="min-h-[60px] md:min-h-[120px]"
+                    variant="neon-blue"
+                  >
+                    <p className="card-title-shine">Pagamento seguro</p>
                     <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
                       <li>• Pagamento via Pix (prioritário) ou cartão</li>
-                      <li>• Checkout Mercado Pago com confirmação automática</li>
+                      <li>
+                        • Checkout Mercado Pago com confirmação automática
+                      </li>
                       <li>• Envio do PDF após pagamento confirmado</li>
                     </ul>
                   </TiltCard>
                   <ParticlesOverlay />
                 </div>
 
-                <div className="flex flex-col items-center gap-3 text-center md:flex-row md:flex-wrap md:items-center md:justify-between md:text-left">
+                <div className="flex flex-col items-center gap-3 text-center md:flex-row md:flex-wrap md:items-center md:justify-between md:text-left w-full max-w-[90%] mx-auto">
+                  <CertificatesCounter />
                   <Dialog.Trigger asChild>
                     <button
                       type="button"
                       onClick={() => {
                         playDeepUiPulseSound();
-                        if (typeof window !== 'undefined' && (window as any).ttq) {
-                          (window as any).ttq.track('InitiateCheckout');
+                        if (
+                          typeof window !== "undefined" &&
+                          (window as any).ttq
+                        ) {
+                          (window as any).ttq.track("InitiateCheckout", {
+                            content_id: "teste_qi_01",
+                            content_type: "product",
+                            value: 6.00,
+                            currency: "BRL"
+                          });
                         }
                       }}
-                      className="button-cta accent-ring md:mx-auto md:block md:max-w-md"
+                      className="button-cta accent-ring w-full max-w-sm md:mx-auto md:block md:max-w-md"
                     >
                       Obter Relatório Completo + Certificado por apenas R$ 6,00
                     </button>
                   </Dialog.Trigger>
-                  <p className="text-[11px] text-muted text-center max-w-[400px] mx-auto">
-                    O relatório completo e o certificado em PDF serão enviados ao
-                    e-mail informado após a confirmação do pagamento.
+                  <p className="text-[10px] md:text-[11px] text-muted text-center max-w-[350px] md:max-w-[400px] mx-auto">
+                    O relatório completo e o certificado em PDF serão enviados
+                    ao e-mail informado após a confirmação do pagamento.
                   </p>
                 </div>
               </div>
@@ -1046,7 +1237,10 @@ export default function HomePage() {
                     </Dialog.Close>
                   </div>
 
-                  <form onSubmit={handlePagamentoSimulado} className="space-y-4">
+                  <form
+                    onSubmit={handlePagamentoSimulado}
+                    className="space-y-4"
+                  >
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">
                         Nome para o certificado
@@ -1057,10 +1251,14 @@ export default function HomePage() {
                         placeholder="Seu nome completo"
                         className="input"
                         value={nome}
-                        onChange={(e) => { setNome(e.target.value); setErroEnvio(null); }}
+                        onChange={(e) => {
+                          setNome(e.target.value);
+                          setErroEnvio(null);
+                        }}
                       />
                       <p className="text-[11px] text-muted">
-                        O nome informado será usado no certificado em PDF anexado ao e-mail.
+                        O nome informado será usado no certificado em PDF
+                        anexado ao e-mail.
                       </p>
                     </div>
 
@@ -1074,11 +1272,15 @@ export default function HomePage() {
                         placeholder="seuemail@exemplo.com"
                         className="input"
                         value={email}
-                        onChange={(e) => { setEmail(e.target.value); setErroEnvio(null); }}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setErroEnvio(null);
+                        }}
                       />
                       <p className="text-[11px] text-muted">
-                        Usaremos este e-mail exclusivamente para enviar o relatório,
-                        o certificado em PDF e instruções de leitura do resultado.
+                        Usaremos este e-mail exclusivamente para enviar o
+                        relatório, o certificado em PDF e instruções de leitura
+                        do resultado.
                       </p>
                     </div>
 
@@ -1119,14 +1321,15 @@ export default function HomePage() {
                             playSecureConfirmationSound();
                             setFase("aguardando-pagamento");
                             setCheckoutOpen(false);
-                            window.open(pagamentoUrl, '_blank');
+                            window.open(pagamentoUrl, "_blank");
                           }}
                           className="button-cta w-full justify-center text-sm py-4 animate-pulse"
                         >
                           ABRIR PAGAMENTO PIX
                         </button>
                         <p className="text-[10px] text-center text-emerald-400 font-medium">
-                          Link gerado! Clique acima para abrir o Mercado Pago e pagar.
+                          Link gerado! Clique acima para abrir o Mercado Pago e
+                          pagar.
                         </p>
                       </div>
                     ) : (
@@ -1136,15 +1339,38 @@ export default function HomePage() {
                           disabled={pagando || !email || !nome}
                           className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
                           onClick={() => {
-                            if (typeof window !== 'undefined' && (window as any).ttq) {
-                              (window as any).ttq.track('InitiateCheckout');
+                            if (
+                              typeof window !== "undefined" &&
+                              (window as any).ttq
+                            ) {
+                              (window as any).ttq.track("InitiateCheckout", {
+                                content_id: "teste_qi_01",
+                                content_type: "product",
+                                value: 6.00,
+                                currency: "BRL"
+                              });
                             }
                           }}
                         >
-                          {pagando ? "Processando pagamento..." : "Pagar R$ 6,00 e receber por e-mail"}
+                          {pagando
+                            ? "Processando pagamento..."
+                            : "Pagar R$ 6,00 e receber por e-mail"}
                         </button>
                         <div className="text-center">
-                          <div style={{ display: 'inline-block', backgroundColor: '#009EE3', color: 'white', padding: '4px 12px', borderRadius: '4px', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: '13px', marginTop: '15px', margin: '15px auto 0 auto' }}>
+                          <div
+                            style={{
+                              display: "inline-block",
+                              backgroundColor: "#009EE3",
+                              color: "white",
+                              padding: "4px 12px",
+                              borderRadius: "4px",
+                              fontFamily: "sans-serif",
+                              fontWeight: "bold",
+                              fontSize: "13px",
+                              marginTop: "15px",
+                              margin: "15px auto 0 auto",
+                            }}
+                          >
                             MERCADO PAGO
                           </div>
                         </div>
@@ -1152,7 +1378,8 @@ export default function HomePage() {
                     )}
 
                     <div className="mt-2 text-center text-[9px] text-muted/60">
-                      Transação segura e confidencial • Dados tratados com criptografia
+                      Transação segura e confidencial • Dados tratados com
+                      criptografia
                     </div>
                   </form>
                 </Dialog.Content>
@@ -1166,30 +1393,45 @@ export default function HomePage() {
                 <div className="w-20 h-20 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-accent animate-pulse">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      className="w-8 h-8"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold text-white">Aguardando Pagamento</h2>
+                <h2 className="text-2xl font-semibold text-white">
+                  Aguardando Pagamento
+                </h2>
                 <p className="text-muted text-sm max-w-xs mx-auto">
-                  Por favor, finalize o pagamento na aba do Mercado Pago que foi aberta.
+                  Por favor, finalize o pagamento na aba do Mercado Pago que foi
+                  aberta.
                 </p>
               </div>
 
               <div className="flex flex-col items-center gap-4 w-full max-w-xs">
                 <div className="w-full rounded-2xl border border-blue-500/40 bg-blue-500/10 px-4 py-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-blue-200">Tempo restante</span>
+                    <span className="text-xs text-blue-200">
+                      Tempo restante
+                    </span>
                     <span className="font-mono text-sm text-blue-100 font-bold">
                       {formatarTempo(tempoExpiracao)}
                     </span>
                   </div>
                   <div className="h-1.5 w-full bg-blue-900/50 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       className="h-full bg-blue-400"
                       initial={{ width: "100%" }}
                       animate={{ width: `${(tempoExpiracao / 600) * 100}%` }}
@@ -1209,7 +1451,7 @@ export default function HomePage() {
                 {pagamentoUrl && (
                   <button
                     type="button"
-                    onClick={() => window.open(pagamentoUrl, '_blank')}
+                    onClick={() => window.open(pagamentoUrl, "_blank")}
                     className="text-xs text-muted hover:text-accent transition-colors"
                   >
                     Não abriu a aba? Clique aqui para abrir novamente
@@ -1229,16 +1471,52 @@ export default function HomePage() {
                   aria-label={successMuted ? "Ativar som" : "Silenciar som"}
                 >
                   {successMuted ? (
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M23 9l-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M17 9l6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        d="M11 5L6 9H2v6h4l5 4V5z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M23 9l-6 6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M17 9l6 6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M15.5 8.5a4.5 4.5 0 010 7" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M18.5 5.5a8 8 0 010 13" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        d="M11 5L6 9H2v6h4l5 4V5z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M15.5 8.5a4.5 4.5 0 010 7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M18.5 5.5a8 8 0 010 13"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   )}
                 </button>
@@ -1246,20 +1524,33 @@ export default function HomePage() {
                 <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
 
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
-                  <svg className="h-10 w-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path className="sucesso-check-path" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-10 w-10 text-emerald-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      className="sucesso-check-path"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
 
                 <div className="mt-5 space-y-3">
                   <h2 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
-                    Parabéns! Seu Certificado de QI Oficial foi Gerado com Sucesso!
+                    Parabéns! Seu Certificado de QI Oficial foi Gerado com
+                    Sucesso!
                   </h2>
                   <p
                     className="sucesso-text-reveal mx-auto max-w-md text-sm leading-relaxed text-muted"
                     style={{ animationDelay: "180ms" }}
                   >
-                    O seu relatório detalhado e o certificado em PDF foram enviados para{" "}
+                    O seu relatório detalhado e o certificado em PDF foram
+                    enviados para{" "}
                     <span className="inline-block max-w-full break-all font-semibold text-foreground">
                       {" "}
                       {email || "(e-mail não informado)"}
@@ -1285,7 +1576,9 @@ export default function HomePage() {
 
                       <div
                         className="mt-2 flex items-baseline justify-center gap-2 text-center"
-                        style={{ textShadow: "0 0 16px rgba(52, 211, 153, 0.35)" }}
+                        style={{
+                          textShadow: "0 0 16px rgba(52, 211, 153, 0.35)",
+                        }}
                       >
                         <span className="font-bold uppercase tracking-[0.22em] text-white text-[1.1rem]">
                           QI estimado:
@@ -1297,12 +1590,20 @@ export default function HomePage() {
                     </div>
                     <div className="mt-6 grid gap-2 text-left text-xs text-muted sm:grid-cols-2">
                       <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">Status</p>
-                        <p className="mt-1 text-emerald-200">Pagamento aprovado</p>
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">
+                          Status
+                        </p>
+                        <p className="mt-1 text-emerald-200">
+                          Pagamento aprovado
+                        </p>
                       </div>
                       <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">Entrega</p>
-                        <p className="mt-1 text-foreground/80">PDF enviado por e-mail</p>
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">
+                          Entrega
+                        </p>
+                        <p className="mt-1 text-foreground/80">
+                          PDF enviado por e-mail
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1319,7 +1620,51 @@ export default function HomePage() {
                     Voltar ao início
                   </button>
                   <p className="max-w-prose text-center text-[11px] text-muted/80">
-                    Obrigado por investir no seu potencial. Seu certificado já pode ser anexado ao currículo e ao LinkedIn.
+                    Obrigado por investir no seu potencial. Seu certificado já
+                    pode ser anexado ao currículo e ao LinkedIn.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Seção de Dúvidas Frequentes (FAQ) */}
+          {(fase === "intro" || fase === "resultado-pronto") && (
+            <div className="mt-12 pt-8 border-t border-border/50 w-full max-w-[90%] mx-auto">
+              <h2 className="text-lg md:text-xl font-semibold text-white mb-6 text-center">
+                Dúvidas Frequentes
+              </h2>
+              <div className="space-y-6">
+                <div className="glass-card p-4 md:p-6 w-full">
+                  <h3 className="text-base md:text-lg font-medium text-foreground">
+                    Entrega rápida
+                  </h3>
+                  <p className="mt-2 text-muted text-sm md:text-base">
+                    Após a confirmação do pagamento, seu relatório detalhado e
+                    certificado em PDF serão enviados imediatamente para o
+                    e-mail cadastrado. Garantimos agilidade e segurança na
+                    entrega.
+                  </p>
+                </div>
+                <div className="glass-card p-4 md:p-6 w-full">
+                  <h3 className="text-base md:text-lg font-medium text-foreground">
+                    Segurança dos dados
+                  </h3>
+                  <p className="mt-2 text-muted text-sm md:text-base">
+                    Valorizamos sua privacidade. Todos os seus dados, incluindo
+                    respostas e informações de pagamento, são tratados com
+                    criptografia e confidencialidade. Não compartilhamos suas
+                    informações com terceiros.
+                  </p>
+                </div>
+                <div className="glass-card p-4 md:p-6 w-full">
+                  <h3 className="text-base md:text-lg font-medium text-foreground">
+                    Suporte
+                  </h3>
+                  <p className="mt-2 text-muted text-sm md:text-base">
+                    Se tiver qualquer dúvida ou precisar de assistência, nossa
+                    equipe de suporte está à disposição para ajudar. Entre em
+                    contato através do e-mail de confirmação ou pelos canais
+                    indicados em nosso site.
                   </p>
                 </div>
               </div>
@@ -1328,66 +1673,71 @@ export default function HomePage() {
         </section>
 
         {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
-        <aside className="glass-card relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex">
-          <div className="space-y-4 text-xs text-muted">
-            <p className="badge-soft">
-              Teste visual • Interface em dark mode profissional
-            </p>
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-muted">
-                Painel em tempo real
+          <aside className="glass-card relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex">
+            <div className="space-y-4 text-xs text-muted">
+              <p className="badge-soft">
+                Teste visual • Interface em dark mode profissional
               </p>
-              <p className="mt-1 text-sm font-medium text-foreground/90">
-                Simulação da jornada de um candidato em um teste de QI
-                profissional.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl bg-slate-950/70 px-3 py-2">
-                <span className="text-[11px] text-muted">Status da sessão</span>
-                <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-300">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  Ativo
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span>Perguntas respondidas</span>
-                  <span className="font-mono text-xs text-foreground/80">
-                    {respondidasParaUi}/{totalPerguntas}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-900">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-accent to-indigo-500 transition-all duration-300"
-                    style={{ width: `${Math.max(progresso, 4)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5 text-[11px]">
-                <p className="text-muted/80">Próximo passo</p>
-                <p className="text-foreground/90">
-                  {fase === "intro"
-                    ? "Inicie o teste para desbloquear seu relatório profissional."
-                    : fase === "quiz"
-                    ? "Responda às questões com calma e atenção aos detalhes."
-                    : "Finalize o checkout para receber o relatório completo por e-mail."}
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted">
+                  Painel em tempo real
+                </p>
+                <p className="mt-1 text-sm font-medium text-foreground/90">
+                  Simulação da jornada de um candidato em um teste de QI
+                  profissional.
                 </p>
               </div>
-            </div>
-          </div>
 
-          <div className="mt-6 border-t border-border/50 pt-4 text-[11px] text-muted">
-            <p>Protótipo de interface para teste de QI profissional com paywall elegante.</p>
-            <p className="mt-1 text-xs text-foreground/70">
-              Ideal para validar jornada de usuário, experiênia de pagamento e
-              percepção de valor em produtos de avaliação.
-            </p>
-          </div>
-        </aside>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-2xl bg-slate-950/70 px-3 py-2">
+                  <span className="text-[11px] text-muted">
+                    Status da sessão
+                  </span>
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-300">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    Ativo
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span>Perguntas respondidas</span>
+                    <span className="font-mono text-xs text-foreground/80">
+                      {respondidasParaUi}/{totalPerguntas}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-900">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-accent to-indigo-500 transition-all duration-300"
+                      style={{ width: `${Math.max(progresso, 4)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-[11px]">
+                  <p className="text-muted/80">Próximo passo</p>
+                  <p className="text-foreground/90">
+                    {fase === "intro"
+                      ? "Inicie o teste para desbloquear seu relatório profissional."
+                      : fase === "quiz"
+                        ? "Responda às questões com calma e atenção aos detalhes."
+                        : "Finalize o checkout para receber o relatório completo por e-mail."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-border/50 pt-4 text-[11px] text-muted">
+              <p>
+                Protótipo de interface para teste de QI profissional com paywall
+                elegante.
+              </p>
+              <p className="mt-1 text-xs text-foreground/70">
+                Ideal para validar jornada de usuário, experiênia de pagamento e
+                percepção de valor em produtos de avaliação.
+              </p>
+            </div>
+          </aside>
         )}
       </div>
     </main>
