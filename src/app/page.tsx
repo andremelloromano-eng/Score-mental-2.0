@@ -193,12 +193,9 @@ export default function HomePage() {
   const paymentSuccessSoundPlayedRef = useRef(false);
   const voltarInicioRef = useRef(false);
   const [successMuted, setSuccessMuted] = useState(false);
-  const [generatedCertificates, setGeneratedCertificates] = useState(() => {
-    const now = new Date();
-    const horas = now.getHours();
-    const minutos = now.getMinutes();
-    return Math.floor(150 + horas * 12 + minutos / 5);
-  });
+
+  // Estado para controle do fluxo de checkout
+  const [clicouNoLink, setClicouNoLink] = useState(false);
 
   // Detecção de mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -216,21 +213,6 @@ export default function HomePage() {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const liveTimeout = setTimeout(() => {
-      setGeneratedCertificates((prev) => prev + 1);
-    }, 5000);
-
-    const interval = setInterval(() => {
-      setGeneratedCertificates((prev) => prev + 1);
-    }, Math.random() * 15000 + 45000);
-
-    return () => {
-      clearTimeout(liveTimeout);
-      clearInterval(interval);
-    };
   }, []);
 
   // use-sound — experiência imersiva e moderna; volumes 0.05/0.08 para elegância.
@@ -326,22 +308,56 @@ export default function HomePage() {
     85 + (acertos / Math.max(totalPerguntas, 1)) * 35,
   );
 
-  const CertificatesCounter = () => (
+  const CertificatesCounter = () => {
+  // Função para calcular certificados com base no horário (Brasília)
+  const calculateCertificates = () => {
+    // Pega o timestamp atual e ajusta manualmente para o fuso de Brasília (UTC-3)
+    const now = new Date();
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const brasiliaTime = new Date(utcTime - (3 * 3600000)); 
+    
+    const hours = brasiliaTime.getHours();
+    const minutes = brasiliaTime.getMinutes();
+    
+    // Base de 120 + 1 certificado a cada 4 minutos (0.25)
+    const baseValue = 120;
+    const dayProgress = (hours * 60) + minutes;
+    
+    // Se for antes das 6h da manhã, mantém o mínimo de 120
+    const calculated = Math.floor(baseValue + (dayProgress * 0.25));
+    return calculated > 120 ? calculated : 120;
+  };
+
+  // Estado inicial já começa com o cálculo certo (evita o pulo no F5)
+  const [count, setCount] = useState(calculateCertificates());
+
+  useEffect(() => {
+    // Atualiza a cada 45 segundos para dar a sensação de vendas reais
+    const timer = setInterval(() => {
+      setCount(prev => prev + 1);
+    }, 45000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
     <div className="w-full flex items-center justify-center gap-2 mt-4 max-w-[90%] mx-auto">
       <span className="text-lg md:text-xl font-bold text-cyan-400">🔥</span>
       <motion.span
-        key={generatedCertificates}
-        initial={{ scale: 1.2, opacity: 0.8 }}
-        animate={{ scale: 1, opacity: 1 }}
+        key={count}
+        initial={{ scale: 1.2, opacity: 0.8, color: '#22d3ee' }}
+        animate={{ scale: 1, opacity: 1, color: '#22d3ee' }}
+        transition={{ duration: 0.5 }}
         className="text-lg md:text-xl font-bold text-cyan-400"
       >
-        {generatedCertificates}
+        {count}
       </motion.span>
       <span className="text-xs md:text-sm font-normal text-gray-300 text-center">
         certificados gerados hoje
       </span>
     </div>
   );
+};
 
   useEffect(() => {
     if (!animando) return;
@@ -931,8 +947,7 @@ export default function HomePage() {
                   width: "100% !important",
                 }}
               >
-                🔒 Ambiente Seguro | ✅ Entrega Garantida via E-mail | ⚡ Pix R$
-                6,00
+                🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
               </div>
             </div>
           )}
@@ -1184,206 +1199,155 @@ export default function HomePage() {
                   <ParticlesOverlay />
                 </div>
 
-                <div className="flex flex-col items-center gap-3 text-center md:flex-row md:flex-wrap md:items-center md:justify-between md:text-left w-full max-w-[90%] mx-auto">
-                  <CertificatesCounter />
-                  <Dialog.Trigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playDeepUiPulseSound();
-                        if (
-                          typeof window !== "undefined" &&
-                          (window as any).ttq
-                        ) {
-                          (window as any).ttq.track("InitiateCheckout", {
-                            content_id: "teste_qi_01",
-                            content_type: "product",
-                            value: 6.00,
-                            currency: "BRL"
-                          });
-                        }
-                      }}
-                      className="button-cta accent-ring w-full max-w-sm md:mx-auto md:block md:max-w-md"
-                    >
-                      Obter Relatório Completo + Certificado por apenas R$ 6,00
-                    </button>
-                  </Dialog.Trigger>
-                  <p className="text-[10px] md:text-[11px] text-muted text-center max-w-[350px] md:max-w-[400px] mx-auto">
-                    O relatório completo e o certificado em PDF serão enviados
-                    ao e-mail informado após a confirmação do pagamento.
-                  </p>
-                </div>
+                <div className="flex flex-col items-center gap-4 text-center w-full max-w-2xl mx-auto mb-6">
+  <CertificatesCounter />
+  
+  <Dialog.Trigger asChild>
+    <button
+      type="button"
+      onClick={() => {
+        playDeepUiPulseSound();
+        if (typeof window !== "undefined" && (window as any).ttq) {
+          (window as any).ttq.track("InitiateCheckout", {
+            content_id: "teste_qi_01",
+            content_type: "product",
+            value: 6.00,
+            currency: "BRL"
+          });
+        }
+      }}
+      className="button-cta accent-ring w-full md:mx-auto md:block md:max-w-md text-base py-4"
+    >
+      Obter Relatório Completo + Certificado por apenas R$ 6,00
+    </button>
+  </Dialog.Trigger>
+
+  <div className="flex flex-col items-center gap-2 w-full mt-2">
+    <p className="text-[11px] text-muted text-center max-w-[420px] mx-auto leading-relaxed">
+      O relatório completo e o certificado em PDF serão enviados
+      ao e-mail informado após a confirmação do pagamento.
+    </p>
+
+    {/* Selos usando apenas Tailwind puro, forçando o tamanho reduzido */}
+    <div className="flex items-center justify-center text-[10px] text-gray-400 opacity-90 whitespace-nowrap gap-1.5 mt-1">
+      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
+    </div>
+  </div>
+</div>
               </div>
 
               <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <div>
-                      <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
-                        <span className="text-green-400">✓</span>
-                        Checkout seguro • R$ 6,00
-                      </Dialog.Title>
-                      <Dialog.Description className="mt-1 text-xs text-muted">
-                        Informe seu melhor e-mail para receber o{" "}
-                        <span className="font-medium text-foreground/90">
-                          Relatório Detalhado + Certificado PDF
-                        </span>{" "}
-                        do seu Teste de QI Profissional.
-                      </Dialog.Description>
-                    </div>
-                    <Dialog.Close className="button-ghost h-8 px-3 text-[11px]">
-                      Fechar
-                    </Dialog.Close>
-                  </div>
+  <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
+  <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
+    <div className="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
+          <span className="text-green-400">✓</span>
+          Checkout seguro • R$ 6,00
+        </Dialog.Title>
+        <Dialog.Description className="mt-1 text-xs text-muted">
+          Preencha seus dados para receber o relatório completo e certificado
+        </Dialog.Description>
+      </div>
+      <Dialog.Close className="text-gray-400 hover:text-white transition-colors">
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </Dialog.Close>
+    </div>
 
-                  <form
-                    onSubmit={handlePagamentoSimulado}
-                    className="space-y-4"
-                  >
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground/80">
-                        Nome para o certificado
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Seu nome completo"
-                        className="input"
-                        value={nome}
-                        onChange={(e) => {
-                          setNome(e.target.value);
-                          setErroEnvio(null);
-                        }}
-                      />
-                      <p className="text-[11px] text-muted">
-                        O nome informado será usado no certificado em PDF
-                        anexado ao e-mail.
-                      </p>
-                    </div>
+    <form onSubmit={handlePagamentoSimulado} className="space-y-5">
+  {/* Campo Nome com Visual Premium */}
+  <div className="space-y-1.5 group">
+    <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-white/30 ml-1 transition-colors group-focus-within:text-blue-400/60">
+      Nome para o certificado
+    </label>
+    <input
+      type="text"
+      placeholder="Seu nome completo"
+      value={nome}
+      onChange={(e) => setNome(e.target.value)}
+      className="w-full rounded-xl border border-white/5 bg-white/[0.03] p-3.5 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/20 focus:border-blue-500/30 focus:bg-white/[0.06] focus:ring-4 focus:ring-blue-500/10"
+      required
+    />
+  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground/80">
-                        E-mail para envio do relatório
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="seuemail@exemplo.com"
-                        className="input"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setErroEnvio(null);
-                        }}
-                      />
-                      <p className="text-[11px] text-muted">
-                        Usaremos este e-mail exclusivamente para enviar o
-                        relatório, o certificado em PDF e instruções de leitura
-                        do resultado.
-                      </p>
-                    </div>
+  {/* Campo E-mail com Visual Premium */}
+  <div className="space-y-1.5 group">
+    <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-white/30 ml-1 transition-colors group-focus-within:text-blue-400/60">
+      E-mail para envio do relatório
+    </label>
+    <input
+      type="email"
+      placeholder="seuemail@exemplo.com"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      className="w-full rounded-xl border border-white/5 bg-white/[0.03] p-3.5 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/20 focus:border-blue-500/30 focus:bg-white/[0.06] focus:ring-4 focus:ring-blue-500/10"
+      required
+    />
+  </div>
 
-                    <div className="flex items-center justify-between rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-300">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                        <span>Pagamento via Pix (Mercado Pago).</span>
-                      </div>
-                      <span className="font-mono text-xs">R$ 6,00</span>
-                    </div>
+  {/* ÁREA DOS BOTÕES (Muda dependendo se o link foi gerado ou não) */}
+  {!pagamentoUrl ? (
+    <button
+      type="submit"
+      disabled={pagando || !email || !nome}
+      className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 mt-2 shadow-lg shadow-blue-500/10"
+    >
+      {pagando ? "Processando..." : "Pagar R$ 6,00 e receber por e-mail"}
+    </button>
+  ) : !clicouNoLink ? (
+    <div className="flex flex-col items-center gap-3 mt-2">
+      <div className="text-center text-green-400 font-medium py-1 animate-pulse">
+        ✓ Link de pagamento gerado!
+      </div>
+      <a
+        href={pagamentoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="button-cta w-full flex justify-center items-center text-center shadow-lg shadow-green-500/20"
+        style={{ textDecoration: 'none' }}
+        onClick={() => {
+          setClicouNoLink(true);
+          setFase("aguardando-pagamento");
+        }}
+      >
+        Abrir QR Code para Pagamento
+      </a>
+    </div>
+  ) : (
+    <div className="flex flex-col items-center gap-3 mt-2">
+      <div className="text-center text-green-400 font-medium py-1 animate-pulse">
+        ✓ Link de pagamento gerado!
+      </div>
+      <div className="text-center text-white py-2">
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+          <span>Aguardando pagamento...</span>
+        </div>
+      </div>
+    </div>
+  )}
 
-                    <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-slate-950/60 px-3 py-2 text-[11px] text-muted">
-                      <span>
-                        Pontuação simulada:{" "}
-                        <span className="font-medium text-foreground/90">
-                          {acertos}/{totalPerguntas}
-                        </span>
-                      </span>
-                      <span>
-                        QI estimado:{" "}
-                        <span className="font-mono text-xs text-foreground/80">
-                          {qiEstimado}
-                        </span>
-                      </span>
-                    </div>
+  {/* SELO DO MERCADO PAGO (Agora fixo, nunca some!) */}
+  <div className="text-center mt-4">
+    <div className="inline-block bg-[#009EE3] text-white px-3 py-1 rounded font-bold text-[11px] tracking-[0.05em] uppercase shadow-sm">
+      Mercado Pago
+    </div>
+  </div>
 
-                    {erroEnvio && (
-                      <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
-                        {erroEnvio}
-                      </div>
-                    )}
-
-                    {pixAberto && pagamentoUrl ? (
-                      <div className="space-y-3 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playSecureConfirmationSound();
-                            setFase("aguardando-pagamento");
-                            setCheckoutOpen(false);
-                            window.open(pagamentoUrl, "_blank");
-                          }}
-                          className="button-cta w-full justify-center text-sm py-4 animate-pulse"
-                        >
-                          ABRIR PAGAMENTO PIX
-                        </button>
-                        <p className="text-[10px] text-center text-emerald-400 font-medium">
-                          Link gerado! Clique acima para abrir o Mercado Pago e
-                          pagar.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          type="submit"
-                          disabled={pagando || !email || !nome}
-                          className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => {
-                            if (
-                              typeof window !== "undefined" &&
-                              (window as any).ttq
-                            ) {
-                              (window as any).ttq.track("InitiateCheckout", {
-                                content_id: "teste_qi_01",
-                                content_type: "product",
-                                value: 6.00,
-                                currency: "BRL"
-                              });
-                            }
-                          }}
-                        >
-                          {pagando
-                            ? "Processando pagamento..."
-                            : "Pagar R$ 6,00 e receber por e-mail"}
-                        </button>
-                        <div className="text-center">
-                          <div
-                            style={{
-                              display: "inline-block",
-                              backgroundColor: "#009EE3",
-                              color: "white",
-                              padding: "4px 12px",
-                              borderRadius: "4px",
-                              fontFamily: "sans-serif",
-                              fontWeight: "bold",
-                              fontSize: "13px",
-                              marginTop: "15px",
-                              margin: "15px auto 0 auto",
-                            }}
-                          >
-                            MERCADO PAGO
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="mt-2 text-center text-[9px] text-muted/60">
-                      Transação segura e confidencial • Dados tratados com
-                      criptografia
-                    </div>
-                  </form>
-                </Dialog.Content>
-              </Dialog.Portal>
+  {/* SEUS SELOS MANTIDOS EXATAMENTE IGUAIS */}
+  <div className="mt-4 flex flex-col items-center gap-1.5">
+    <div className="text-center text-[9px] text-muted/50 uppercase tracking-tighter">
+      Transação segura e confidencial • Dados tratados com criptografia
+    </div>
+    <div className="flex items-center justify-center text-[9px] text-gray-500 opacity-80 whitespace-nowrap gap-1.5">
+      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
+    </div>
+  </div>
+</form>
+  </Dialog.Content>
+</Dialog.Portal>
             </Dialog.Root>
           )}
 
