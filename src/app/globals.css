@@ -13,12 +13,12 @@ body {
 }
 
 body {
-  @apply bg-background text-foreground;
-  background: radial-gradient(circle at top, #1f2937 0, #020617 40%, #020617 100%);
+  /* Removemos o radial-gradient e o bg-background que bloqueavam a visão */
+  @apply bg-transparent text-foreground;
 }
 
 .glass-card {
-  @apply bg-card/80 border border-border/60 shadow-soft rounded-3xl backdrop-blur-xl;
+  @apply border border-border/60 shadow-soft rounded-3xl;
 }
 
 .accent-ring {
@@ -413,4 +413,10 @@ body {
     opacity: 1;
     transform: none;
   }
+}
+
+/* Limpador final - Garante que nenhuma seção bloqueie o fundo das partículas */
+main, section, .min-h-screen {
+  background: transparent !important;
+  background-color: transparent !important;
 }

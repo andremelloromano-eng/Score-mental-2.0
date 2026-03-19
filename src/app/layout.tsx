@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import "./globals.css";
 import ParticlesBackground from "@/components/ParticlesBackground";
+import ScrollHandler from "@/components/ScrollHandler";
 
 export const metadata: Metadata = {
   title: "Teste de QI Profissional",
@@ -40,9 +41,11 @@ var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n
         />
         {/* TikTok Pixel Code End */}
       </head>
-      <body className="relative min-h-screen max-w-[100vw] overflow-x-hidden bg-background text-foreground antialiased">
+      {/* Removemos o bg-background e forçamos o fundo transparente aqui */}
+      <body className="relative min-h-screen max-w-[100vw] overflow-x-hidden bg-transparent text-foreground antialiased">
+        <ScrollHandler />
         <ParticlesBackground />
-        <div className="relative z-10">{children}</div>
+        <div className="relative z-0 bg-transparent">{children}</div>
         <script
           src="https://sdk.mercadopago.com/js/v2"
           async

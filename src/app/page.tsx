@@ -8,7 +8,6 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as Progress from "@radix-ui/react-progress";
 import perguntas from "@/data/perguntas.json";
 import useSound from "use-sound";
-import { ParticlesOverlay } from "@/components/ParticlesBackground";
 import { playHoverSound } from "@/lib/hoverSound";
 import {
   playDeepUiPulseSound,
@@ -196,6 +195,21 @@ export default function HomePage() {
 
   // Estado para controle do fluxo de checkout
   const [clicouNoLink, setClicouNoLink] = useState(false);
+
+  // Estado para controle de cópia de e-mail
+  const [copiado, setCopiado] = useState(false);
+
+  const handleEmailClick = () => {
+    const email = "suporte.scoremental@outlook.com";
+    // Copia o e-mail para a área de transferência
+    navigator.clipboard.writeText(email);
+    
+    // Mostra a mensagem de copiado
+    setCopiado(true);
+    
+    // Esconde a mensagem depois de 2 segundos
+    setTimeout(() => setCopiado(false), 2000);
+  };
 
   // Detecção de mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -419,6 +433,7 @@ export default function HomePage() {
 
   function irParaProximaPergunta(proximaIndex: number) {
     playTransitionSlide();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (intervaloRef.current) {
       clearInterval(intervaloRef.current);
       intervaloRef.current = null;
@@ -454,6 +469,7 @@ export default function HomePage() {
   }
 
   function handleContinuar() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (!opcaoSelecionadaAtual) return;
     setRespostas((prev) => ({
       ...prev,
@@ -476,6 +492,7 @@ export default function HomePage() {
   }, [successMuted]);
 
   const handleTempoEsgotado = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (
       fase === "quiz" &&
       perguntaAtual &&
@@ -804,13 +821,10 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-900 px-4 py-10 text-white">
+    <main className="flex min-h-screen items-center justify-center px-4 py-10 text-white">
       <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 md:flex-row">
-        <div className="pointer-events-none absolute inset-0 -z-10 blur-3xl">
-          <div className="mx-auto h-full max-w-3xl bg-gradient-to-br from-accent/20 via-transparent to-indigo-900/10 opacity-70" />
-        </div>
 
-        <section className="glass-card flex-1 p-6 md:p-8 border border-white/10 bg-slate-900/50 backdrop-blur-xl">
+        <section className="glass-card flex-1 p-6 md:p-8 relative z-10" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
           {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
             <header className="mb-6 flex items-start justify-between gap-4">
               <div className="space-y-3">
@@ -915,7 +929,6 @@ export default function HomePage() {
                     currículo ou LinkedIn.
                   </p>
                 </TiltCard>
-                <ParticlesOverlay />
               </div>
 
               <div className="mt-8 flex flex-col items-center justify-center w-full gap-4 text-center">
@@ -934,21 +947,9 @@ export default function HomePage() {
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
               </div>
-              <div
-                style={{
-                  display: "flex !important",
-                  flexWrap: "nowrap" as any,
-                  justifyContent: "center !important",
-                  alignItems: "center !important",
-                  whiteSpace: "nowrap !important",
-                  fontSize: "9px !important",
-                  gap: "4px !important",
-                  marginTop: "10px !important",
-                  width: "100% !important",
-                }}
-              >
-                🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
-              </div>
+              <div className="flex w-full items-center justify-center gap-1.5 mt-3 whitespace-nowrap text-[11px] text-white/40 font-medium tracking-wide">
+  🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
+</div>
             </div>
           )}
 
@@ -1061,7 +1062,7 @@ export default function HomePage() {
                       onClick={() => handleSelecionarOpcao(opcao.id)}
                       className={`group relative flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                         selecionada
-                          ? "border-accent bg-accent-soft/40 text-foreground shadow-soft shadow-accent/20"
+                          ? "border-accent bg-accent-soft/40 text-foreground shadow-soft"
                           : "border-border/70 bg-slate-950/60 text-foreground/90 hover:border-accent/60 hover:bg-slate-900/80"
                       }`}
                     >
@@ -1083,7 +1084,6 @@ export default function HomePage() {
                     </button>
                   );
                 })}
-                <ParticlesOverlay />
               </div>
 
               <div className="mt-4 flex justify-center">
@@ -1104,8 +1104,8 @@ export default function HomePage() {
             onOpenChange={(open) => !open && handleFecharMensagemMetade()}
           >
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
+              <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl outline-none">
                 <div className="space-y-4 text-center">
                   <span className="badge-soft">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -1196,7 +1196,6 @@ export default function HomePage() {
                       <li>• Envio do PDF após pagamento confirmado</li>
                     </ul>
                   </TiltCard>
-                  <ParticlesOverlay />
                 </div>
 
                 <div className="flex flex-col items-center gap-4 text-center w-full max-w-2xl mx-auto mb-6">
@@ -1237,8 +1236,8 @@ export default function HomePage() {
               </div>
 
               <Dialog.Portal>
-  <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
-  <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl shadow-black/80 outline-none">
+  <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
+  <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl outline-none">
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
         <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
@@ -1427,7 +1426,7 @@ export default function HomePage() {
 
           {fase === "sucesso" && (
             <div className="relative flex w-full max-w-[100vw] flex-col items-center justify-center overflow-x-hidden px-1 py-6 text-center sm:py-10">
-              <div className="sucesso-card-celebrate relative w-full max-w-xl overflow-hidden rounded-3xl border border-border/60 bg-card/50 p-6 shadow-soft backdrop-blur-xl sm:p-8">
+              <div className="sucesso-card-celebrate relative w-full max-w-xl overflow-hidden rounded-3xl border border-border/60 p-6 shadow-soft sm:p-8" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
                 <button
                   type="button"
                   onClick={() => setSuccessMuted((v) => !v)}
@@ -1598,7 +1597,7 @@ export default function HomePage() {
                 Dúvidas Frequentes
               </h2>
               <div className="space-y-6">
-                <div className="glass-card p-4 md:p-6 w-full">
+                <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
                   <h3 className="text-base md:text-lg font-medium text-foreground">
                     Entrega rápida
                   </h3>
@@ -1609,7 +1608,7 @@ export default function HomePage() {
                     entrega.
                   </p>
                 </div>
-                <div className="glass-card p-4 md:p-6 w-full">
+                <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
                   <h3 className="text-base md:text-lg font-medium text-foreground">
                     Segurança dos dados
                   </h3>
@@ -1620,24 +1619,38 @@ export default function HomePage() {
                     informações com terceiros.
                   </p>
                 </div>
-                <div className="glass-card p-4 md:p-6 w-full">
-                  <h3 className="text-base md:text-lg font-medium text-foreground">
-                    Suporte
-                  </h3>
-                  <p className="mt-2 text-muted text-sm md:text-base">
-                    Se tiver qualquer dúvida ou precisar de assistência, nossa
-                    equipe de suporte está à disposição para ajudar. Entre em
-                    contato através do e-mail de confirmação ou pelos canais
-                    indicados em nosso site.
-                  </p>
-                </div>
+                <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full transition-all duration-300 hover:bg-white/5 hover:border-white/20 hover:shadow-lg active:scale-[0.98]" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
+  <h3 className="text-base md:text-lg font-medium text-foreground">
+    Suporte
+  </h3>
+  <p className="mt-2 text-muted text-sm md:text-base">
+    Se tiver qualquer dúvida ou precisar de assistência, nossa
+    equipe de suporte está à disposição para ajudar. Entre em
+    contato através do e-mail{" "}
+    <a 
+      href="mailto:suporte.scoremental@outlook.com" 
+      onClick={handleEmailClick}
+      className="relative text-blue-400 font-medium hover:text-blue-300 hover:underline transition-colors inline-block"
+    >
+      suporte.scoremental@outlook.com
+      
+      {/* Balãozinho de Copiado que aparece ao clicar */}
+      {copiado && (
+        <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg animate-bounce whitespace-nowrap z-10">
+          ✓ Copiado!
+        </span>
+      )}
+    </a>{" "}
+    ou pelos canais indicados em nosso site.
+  </p>
+</div>
               </div>
             </div>
           )}
         </section>
 
         {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
-          <aside className="glass-card relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex">
+          <aside className="relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex rounded-3xl border border-border/60 shadow-soft" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
             <div className="space-y-4 text-xs text-muted">
               <p className="badge-soft">
                 Teste visual • Interface em dark mode profissional
