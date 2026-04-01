@@ -822,9 +822,9 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10 text-white">
-      <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 md:flex-row">
+      <div className="relative z-50 isolate bg-[#020617] rounded-3xl border border-white/10 p-6 md:p-8 flex flex-col md:flex-row gap-8 w-full max-w-4xl mx-auto">
 
-        <section className="glass-card flex-1 p-6 md:p-8 relative z-10" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
+        <section className="flex-1">
           {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
             <header className="mb-6 flex items-start justify-between gap-4">
               <div className="space-y-3">
@@ -1650,7 +1650,7 @@ export default function HomePage() {
         </section>
 
         {fase !== "aguardando-pagamento" && fase !== "sucesso" && (
-          <aside className="relative hidden w-full max-w-xs flex-col justify-between p-5 md:flex rounded-3xl border border-border/60 shadow-soft" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
+          <aside className="hidden w-full max-w-xs flex-col justify-between p-5 md:flex">
             <div className="space-y-4 text-xs text-muted">
               <p className="badge-soft">
                 Teste visual • Interface em dark mode profissional
