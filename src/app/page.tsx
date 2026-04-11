@@ -123,6 +123,7 @@ function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
   return (
     <h1
       className="hero-title-shine overflow-visible pl-px text-2xl font-semibold tracking-tight md:text-3xl"
+      data-text={HERO_TITLE}
       onMouseEnter={() => onWordHover?.()}
     >
       {HERO_TITLE}
@@ -1390,11 +1391,11 @@ export default function HomePage() {
                     <p className="text-xs uppercase tracking-[0.15em] text-white/40 font-semibold">O que está incluso:</p>
                     <ul className="space-y-1.5 text-gray-300">
                       <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Dashboard completo com scores por área</li>
-                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Análise detalhada de 5 competências cognitivas</li>
                       <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Comparação populacional (Curva de Gauss)</li>
                       <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Guia de Carreira personalizado</li>
                       <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Detalhamento questão por questão</li>
                       <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> 12 páginas de conteúdo exclusivo</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Análise detalhada de 5 competências cognitivas</li>
                     </ul>
                   </div>
 
@@ -1414,13 +1415,13 @@ export default function HomePage() {
                             });
                           }
                         }}
-                        className="button-cta accent-ring w-full md:max-w-md text-base py-4"
+                        className="button-cta accent-ring w-full md:max-w-md text-sm sm:text-base py-4 whitespace-nowrap"
                       >
                         🔓 Desbloquear Relatório Premium — R$ 9,90
                       </button>
                     </Dialog.Trigger>
-                    <p className="text-[11px] text-muted text-center">
-                      ⚡ Entrega imediata no seu e-mail • 🔒 Pagamento seguro via Pix
+                    <p className="text-[10px] sm:text-[11px] text-muted text-center whitespace-nowrap">
+                      ⚡ Entrega imediata no e-mail • 🔒 Pagamento seguro via Pix
                     </p>
                   </div>
                 </div>
@@ -1732,21 +1733,8 @@ export default function HomePage() {
 
                 <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
 
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
-                  <svg
-                    className="h-10 w-10 text-emerald-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      className="sucesso-check-path"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={3}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                <div className="sucesso-check-icon mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
+                  <span className="text-4xl leading-none" role="img" aria-label="Sucesso">✅</span>
                 </div>
 
                 <div className="mt-5 space-y-3">

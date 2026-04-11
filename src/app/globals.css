@@ -119,18 +119,6 @@ body {
   animation: shine-sweep 3s ease-in-out infinite;
 }
 
-@-webkit-keyframes title-shine {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
 @keyframes title-shine {
   0% {
     background-position: 0% 50%;
@@ -143,37 +131,54 @@ body {
   }
 }
 
+/* Hero title: ::before com data-text para garantir animação no Safari iOS */
 .hero-title-shine {
-  background-image: linear-gradient(90deg, #ffffff 0%, #93c5fd 28%, #34d399 55%, #a855f7 100%);
-  background-size: 220% 100%;
-  background-position: 0% 50%;
+  position: relative;
+  color: #fff;
+}
+
+.hero-title-shine::before {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #93c5fd, #34d399, #a855f7, #93c5fd);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: transparent;
-  -webkit-animation: title-shine 3s ease-in-out infinite;
   animation: title-shine 3s ease-in-out infinite;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
 }
 
-.hero-title-shine:hover,
-.hero-title-shine:hover * {
-  -webkit-transform: translateZ(0) !important;
-  transform: translateZ(0) !important;
+/* Fallback: se ::before não animar (alguns WebKit antigos), animar hue-rotate no texto base */
+@supports not (background-clip: text) {
+  .hero-title-shine {
+    color: #93c5fd;
+    animation: hue-shift 3s ease-in-out infinite;
+  }
+  .hero-title-shine::before {
+    display: none;
+  }
+}
+
+@keyframes hue-shift {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(90deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+@keyframes card-color-cycle {
+  0% { color: #e2e8f0; }
+  33% { color: #bfdbfe; }
+  66% { color: #7dd3fc; }
+  100% { color: #e2e8f0; }
 }
 
 .card-title-shine {
-  background-image: linear-gradient(90deg, #e2e8f0 0%, #bfdbfe 50%, #7dd3fc 100%);
-  background-size: 220% 100%;
-  background-position: 0% 50%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  -webkit-animation: title-shine 3s ease-in-out infinite;
-  animation: title-shine 3s ease-in-out infinite;
   font-weight: bold;
+  animation: card-color-cycle 3s ease-in-out infinite;
 }
 
 .button-ghost {
@@ -267,104 +272,99 @@ body {
 }
 
 .sucesso-card-celebrate {
+  -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
   transform: translateZ(0);
 }
 
+@-webkit-keyframes sucesso-pop {
+  0% { opacity: 0; -webkit-transform: scale(0.86); transform: scale(0.86); }
+  60% { opacity: 1; -webkit-transform: scale(1.03); transform: scale(1.03); }
+  100% { opacity: 1; -webkit-transform: scale(1); transform: scale(1); }
+}
 @keyframes sucesso-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.86);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.03);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0% { opacity: 0; -webkit-transform: scale(0.86); transform: scale(0.86); }
+  60% { opacity: 1; -webkit-transform: scale(1.03); transform: scale(1.03); }
+  100% { opacity: 1; -webkit-transform: scale(1); transform: scale(1); }
 }
 
+@-webkit-keyframes sucesso-swing {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  18% { -webkit-transform: rotate(1.2deg); transform: rotate(1.2deg); }
+  42% { -webkit-transform: rotate(-1deg); transform: rotate(-1deg); }
+  66% { -webkit-transform: rotate(0.6deg); transform: rotate(0.6deg); }
+  100% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+}
 @keyframes sucesso-swing {
-  0% {
-    transform: rotate(0deg);
-  }
-  18% {
-    transform: rotate(1.2deg);
-  }
-  42% {
-    transform: rotate(-1deg);
-  }
-  66% {
-    transform: rotate(0.6deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  18% { -webkit-transform: rotate(1.2deg); transform: rotate(1.2deg); }
+  42% { -webkit-transform: rotate(-1deg); transform: rotate(-1deg); }
+  66% { -webkit-transform: rotate(0.6deg); transform: rotate(0.6deg); }
+  100% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
 }
 
+@-webkit-keyframes sucesso-fade-up {
+  0% { opacity: 0; -webkit-transform: translateY(10px); transform: translateY(10px); }
+  100% { opacity: 1; -webkit-transform: translateY(0); transform: translateY(0); }
+}
 @keyframes sucesso-fade-up {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { opacity: 0; -webkit-transform: translateY(10px); transform: translateY(10px); }
+  100% { opacity: 1; -webkit-transform: translateY(0); transform: translateY(0); }
 }
 
+@-webkit-keyframes sucesso-check-draw {
+  to { stroke-dashoffset: 0; }
+}
 @keyframes sucesso-check-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
+  to { stroke-dashoffset: 0; }
 }
 
+@-webkit-keyframes sucesso-check-pulse {
+  0%, 100% { -webkit-transform: scale(1); transform: scale(1); }
+  50% { -webkit-transform: scale(1.06); transform: scale(1.06); }
+}
 @keyframes sucesso-check-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
+  0%, 100% { -webkit-transform: scale(1); transform: scale(1); }
+  50% { -webkit-transform: scale(1.06); transform: scale(1.06); }
 }
 
+@-webkit-keyframes sucesso-glow {
+  0%, 100% { opacity: 0.65; -webkit-filter: blur(14px); filter: blur(14px); }
+  50% { opacity: 0.9; -webkit-filter: blur(18px); filter: blur(18px); }
+}
 @keyframes sucesso-glow {
-  0%,
-  100% {
-    opacity: 0.65;
-    filter: blur(14px);
-  }
-  50% {
-    opacity: 0.9;
-    filter: blur(18px);
-  }
+  0%, 100% { opacity: 0.65; -webkit-filter: blur(14px); filter: blur(14px); }
+  50% { opacity: 0.9; -webkit-filter: blur(18px); filter: blur(18px); }
 }
 
+@-webkit-keyframes sucesso-spin {
+  to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
 @keyframes sucesso-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
 }
 
 .sucesso-card-celebrate {
+  -webkit-animation: sucesso-pop 460ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    sucesso-swing 680ms ease-in-out 480ms both;
   animation: sucesso-pop 460ms cubic-bezier(0.22, 1, 0.36, 1) both,
     sucesso-swing 680ms ease-in-out 480ms both;
 }
 
-.sucesso-check-path {
-  stroke-dasharray: 48;
-  stroke-dashoffset: 48;
-  transform-origin: 50% 50%;
-  animation: sucesso-check-draw 620ms ease-out 120ms forwards,
-    sucesso-check-pulse 1.25s ease-in-out 860ms infinite;
+/* Ícone check: aparece com scale bounce (emoji, funciona em todos os browsers) */
+.sucesso-check-icon {
+  -webkit-animation: sucesso-pop 500ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    sucesso-check-pulse 2s ease-in-out 700ms infinite;
+  animation: sucesso-pop 500ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    sucesso-check-pulse 2s ease-in-out 700ms infinite;
 }
 
 .sucesso-text-reveal {
   opacity: 0;
+  -webkit-transform: translateY(10px);
   transform: translateY(10px);
+  -webkit-animation: sucesso-fade-up 520ms ease-out forwards;
   animation: sucesso-fade-up 520ms ease-out forwards;
 }
 
@@ -376,18 +376,25 @@ body {
   box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 24px 80px rgba(2, 6, 23, 0.75);
 }
 
+/* Borda animada: linear-gradient (Safari iOS não anima conic-gradient corretamente) */
 .sucesso-diploma::before {
   content: "";
   position: absolute;
-  inset: -48px;
-  background: conic-gradient(
-    from 180deg,
+  top: -48px;
+  left: -48px;
+  right: -48px;
+  bottom: -48px;
+  background: linear-gradient(
+    135deg,
     rgba(16, 185, 129, 0.35),
     rgba(99, 102, 241, 0.35),
     rgba(168, 85, 247, 0.25),
     rgba(16, 185, 129, 0.35)
   );
-  animation: sucesso-spin 9s linear infinite, sucesso-glow 3.2s ease-in-out infinite;
+  -webkit-filter: blur(14px);
+  filter: blur(14px);
+  -webkit-animation: sucesso-spin 9s linear infinite;
+  animation: sucesso-spin 9s linear infinite;
   z-index: 0;
 }
 
@@ -414,7 +421,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .sucesso-card-celebrate,
-  .sucesso-check-path,
+  .sucesso-check-icon,
   .sucesso-text-reveal,
   .sucesso-diploma::before,
   .sucesso-cta,
@@ -422,7 +429,9 @@ body {
   .button-emerald::after,
   .button-cta,
   .button-cta::after,
-  .hero-title-shine {
+  .hero-title-shine,
+  .hero-title-shine::before,
+  .card-title-shine {
     animation: none !important;
     transition: none !important;
   }
