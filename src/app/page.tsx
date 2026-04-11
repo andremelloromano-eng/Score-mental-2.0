@@ -132,7 +132,7 @@ function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
         color: "transparent",
       }}
       animate={{ backgroundPosition: ["0% 50%", "-400% 50%"] }}
-      transition={{ duration: 12, ease: "linear", repeat: Infinity }}
+      transition={{ duration: 18, ease: "linear", repeat: Infinity }}
       onMouseEnter={() => onWordHover?.()}
     >
       {HERO_TITLE}
@@ -1587,7 +1587,8 @@ export default function HomePage() {
           setFase("aguardando-pagamento");
         }}
       >
-        Abrir QR Code para Pagamento
+        <ShineOverlay />
+        <span className="relative z-[1]">Abrir QR Code para Pagamento</span>
       </a>
     </div>
   ) : (
@@ -1605,8 +1606,8 @@ export default function HomePage() {
   )}
 
   <div className="text-center mt-4">
-    <div className="inline-block bg-[#009EE3] text-white px-3 py-1 rounded font-bold text-[11px] tracking-[0.05em] uppercase shadow-sm">
-      Mercado Pago
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-[10px] text-[#9ca3af] tracking-wide">
+      🔒 Processado por Mercado Pago
     </div>
   </div>
 
@@ -1815,7 +1816,19 @@ export default function HomePage() {
                   transition={{ duration: 0.5, delay: 0.32, ease: "easeOut" }}
                 >
                   <div className="sucesso-diploma w-full rounded-3xl px-4 py-4 sm:px-6 sm:py-6">
-                    <div className="flex flex-col items-center gap-3 text-center">
+                    {/* Gradiente animado de borda (Framer Motion — funciona no Safari iOS) */}
+                    <motion.div
+                      className="absolute pointer-events-none"
+                      style={{
+                        top: -48, left: -48, right: -48, bottom: -48,
+                        background: "linear-gradient(135deg, rgba(16,185,129,0.35), rgba(99,102,241,0.35), rgba(168,85,247,0.25), rgba(16,185,129,0.35))",
+                        filter: "blur(14px)",
+                        zIndex: 0,
+                      }}
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 9, ease: "linear", repeat: Infinity }}
+                    />
+                    <div className="flex flex-col items-center gap-3 text-center relative z-[1]">
                       <div className="w-full min-w-0">
                         <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
                           Relatório Premium
@@ -1839,7 +1852,7 @@ export default function HomePage() {
                         </span>
                       </div>
                     </div>
-                    <div className="mt-6 grid gap-2 text-left text-xs text-muted sm:grid-cols-2">
+                    <div className="mt-6 grid gap-2 text-left text-xs text-muted sm:grid-cols-2 relative z-[1]">
                       <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
                         <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">
                           Relatório
@@ -1868,9 +1881,10 @@ export default function HomePage() {
                 >
                   <button
                     onClick={handleVoltarAoInicio}
-                    className="sucesso-cta inline-flex w-full max-w-xs items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-transform active:scale-[0.98] sm:w-auto"
+                    className="sucesso-cta relative overflow-hidden inline-flex w-full max-w-xs items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-transform active:scale-[0.98] sm:w-auto"
                   >
-                    Voltar ao início
+                    <ShineOverlay />
+                    <span className="relative z-[1]">Voltar ao início</span>
                   </button>
                   <p className="max-w-prose text-center text-[11px] text-muted/80">
                     Seu relatório inclui análise de 5 áreas cognitivas, comparação
