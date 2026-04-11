@@ -123,7 +123,6 @@ function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
   return (
     <h1
       className="hero-title-shine overflow-visible pl-px text-2xl font-semibold tracking-tight md:text-3xl"
-      data-text={HERO_TITLE}
       onMouseEnter={() => onWordHover?.()}
     >
       {HERO_TITLE}
