@@ -8,17 +8,74 @@ import { playShimmeringSuccessSound } from "@/lib/purpleButtonSounds";
 type Props = {
   email?: string;
   celebrated?: boolean;
+  paymentId?: string;
 };
 
 const MOBILE_BREAKPOINT = 768;
 
-export function SucessoCard({ email, celebrated = false }: Props) {
+export function SucessoCard({ email: emailProp, celebrated = false, paymentId }: Props) {
   const confettiFired = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [emailDisplay] = useState(emailProp || "");
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const triggeredRef = useRef(false);
 
   useLayoutEffect(() => {
     setIsMobile(typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT);
   }, []);
+
+  // Quando chegamos via redirect do Mercado Pago (cartão), dispara o status check
+  // para garantir que o webhook processou e o e-mail foi enviado
+  useEffect(() => {
+    if (!paymentId || triggeredRef.current) return;
+    triggeredRef.current = true;
+
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`);
+        const data = await res.json().catch(() => ({})) as {
+          status?: string;
+          delivered?: boolean;
+          sending?: boolean;
+          error?: string;
+        };
+
+        if (data.delivered) {
+          setStatusMsg("Relatório enviado com sucesso!");
+          return;
+        }
+
+        if (data.status === "approved") {
+          setStatusMsg("Pagamento confirmado! Enviando relatório...");
+          // Tentar novamente em alguns segundos para confirmar envio
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 3000);
+          }
+          return;
+        }
+
+        if (data.status === "pending" || data.sending) {
+          setStatusMsg("Processando pagamento...");
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 3000);
+          }
+          return;
+        }
+      } catch {
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 3000);
+        }
+      }
+    };
+
+    checkStatus();
+  }, [paymentId]);
 
   const totalDuration = isMobile ? 0.6 : 1.2;
   const shakeDuration = totalDuration * 0.72;
@@ -86,6 +143,8 @@ export function SucessoCard({ email, celebrated = false }: Props) {
     };
   }, [celebrated, isMobile]);
 
+  const displayEmail = emailDisplay || emailProp;
+
   return (
     <motion.section
       className="glass-card sucesso-card-celebrate relative max-w-full overflow-x-hidden p-8"
@@ -117,27 +176,34 @@ export function SucessoCard({ email, celebrated = false }: Props) {
           Pagamento aprovado
         </p>
         <h1 className="text-2xl font-semibold text-white">
-          Pagamento confirmado! Seu certificado de 12 páginas foi enviado.
+          Relatório Premium Enviado!
         </h1>
         <p className="max-w-lg text-sm text-muted">
-          Pagamento confirmado! Seu certificado de 12 páginas foi enviado para o e-mail:{" "}
-          <span className="font-medium text-foreground/90">{email || "(e-mail não informado)"}</span>
+          Seu relatório detalhado de 12 páginas foi enviado para{" "}
+          <span className="font-medium text-foreground/90">{displayEmail || "(e-mail não informado)"}</span>
         </p>
       </header>
 
       <div className="space-y-4 text-sm text-muted">
-        {email && (
+        {statusMsg && (
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+            {statusMsg}
+          </div>
+        )}
+
+        {displayEmail && (
           <div className="flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 text-center text-xs text-emerald-100 md:flex-row md:items-center md:justify-between md:text-left">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300">
                 E-mail de envio
               </p>
               <p className="mt-0.5 break-words font-mono text-sm text-emerald-100">
-                {email}
+                {displayEmail}
               </p>
             </div>
             <span className="badge-glow-pulse shrink-0 rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-medium">
-              Resultado a caminho
+              Relatório a caminho
             </span>
           </div>
         )}
@@ -145,12 +211,12 @@ export function SucessoCard({ email, celebrated = false }: Props) {
         <ul className="space-y-2 text-xs text-muted">
           <li>• Verifique também a pasta de spam ou promoções.</li>
           <li>
-            • O certificado em PDF poderá ser baixado e anexado ao seu currículo
-            ou perfil profissional.
+            • O relatório inclui análise de 5 áreas cognitivas, comparação populacional,
+            guia de carreira e detalhamento questão por questão.
           </li>
           <li>
-            • Caso não receba em alguns minutos, você poderá reenviar o relatório
-            a partir da área do candidato (neste protótipo, ação ilustrativa).
+            • Caso não receba em alguns minutos, entre em contato com
+            suporte.scoremental@outlook.com.
           </li>
         </ul>
       </div>

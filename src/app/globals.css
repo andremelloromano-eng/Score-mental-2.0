@@ -119,6 +119,18 @@ body {
   animation: shine-sweep 3s ease-in-out infinite;
 }
 
+@-webkit-keyframes title-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 @keyframes title-shine {
   0% {
     background-position: 0% 50%;
@@ -137,14 +149,18 @@ body {
   background-position: 0% 50%;
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
+  -webkit-animation: title-shine 3s ease-in-out infinite;
   animation: title-shine 3s ease-in-out infinite;
-  transform: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .hero-title-shine:hover,
 .hero-title-shine:hover * {
-  transform: none !important;
+  -webkit-transform: translateZ(0) !important;
+  transform: translateZ(0) !important;
 }
 
 .card-title-shine {
@@ -153,7 +169,9 @@ body {
   background-position: 0% 50%;
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
+  -webkit-animation: title-shine 3s ease-in-out infinite;
   animation: title-shine 3s ease-in-out infinite;
   font-weight: bold;
 }

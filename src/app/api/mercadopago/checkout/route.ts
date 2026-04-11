@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MercadoPagoConfig, Payment } from "mercadopago";
+import { MercadoPagoConfig, Payment, Preference } from "mercadopago";
 
 type Payload = {
   email?: string;
@@ -8,6 +8,7 @@ type Payload = {
   acertos?: number;
   totalPerguntas?: number;
   qiEstimado?: number;
+  metodo?: "pix" | "cartao";
 };
 
 type PendingCheckoutPayload = Required<Pick<Payload, "email" | "nome">> &
@@ -157,10 +158,68 @@ export async function POST(request: Request) {
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     const mpClient = getMpClient();
+    const transactionAmount = 9.90;
+    const metodo = body.metodo === "cartao" ? "cartao" : "pix";
+
+    if (metodo === "cartao") {
+      // Checkout Pro (Preference) — suporta cartão de crédito, débito e outros meios
+      const preference = new Preference(mpClient);
+      const prefBody = {
+        items: [
+          {
+            id: "relatorio_premium",
+            title: description,
+            quantity: 1,
+            unit_price: transactionAmount,
+            currency_id: "BRL"
+          }
+        ],
+        payer: {
+          email: payerEmail,
+          name: nome
+        },
+        metadata: {
+          report_email: email,
+          report_nome: nome,
+          report_respostas: body.respostas ?? {},
+          report_created_at: Date.now()
+        },
+        external_reference: token,
+        notification_url: notificationUrl,
+        back_urls: {
+          success: `${origin}/sucesso`,
+          failure: `${origin}`,
+          pending: `${origin}`
+        },
+        auto_return: "approved" as const,
+        expires: true,
+        expiration_date_to: expiresAt
+      } as unknown as Record<string, unknown>;
+
+      const prefResult = await preference.create({
+        body: prefBody as never
+      });
+
+      const initPoint = (prefResult as unknown as { init_point?: string }).init_point;
+
+      if (!initPoint) {
+        console.error("[mercadopago/checkout] init_point ausente (cartão)");
+        return NextResponse.json({ error: "Falha ao iniciar checkout por cartão." }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        url: initPoint,
+        paymentId: null,
+        externalReference: token,
+        metodo: "cartao"
+      });
+    }
+
+    // Fluxo Pix direto (existente)
     const payment = new Payment(mpClient);
 
     const paymentBody = {
-      transaction_amount: 6,
+      transaction_amount: transactionAmount,
       description,
       payment_method_id: "pix",
       date_of_expiration: expiresAt,
@@ -194,7 +253,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       url: ticketUrl,
-      paymentId: (result as unknown as { id?: unknown }).id
+      paymentId: (result as unknown as { id?: unknown }).id,
+      externalReference: token,
+      metodo: "pix"
     });
   } catch (err) {
     let msg = getMercadoPagoErrorMessage(err);

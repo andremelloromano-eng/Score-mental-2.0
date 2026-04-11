@@ -130,6 +130,28 @@ function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
   );
 }
 
+function classificacaoQI(qi: number): string {
+  if (qi > 130) return "Excepcional";
+  if (qi >= 116) return "Excelente";
+  if (qi >= 101) return "Muito bom";
+  if (qi >= 85) return "Bom";
+  return "Abaixo da média";
+}
+
+function percentilFromQi(qi: number): number {
+  if (qi >= 145) return 99;
+  if (qi >= 130) return 98;
+  if (qi >= 120) return 91;
+  if (qi >= 116) return 84;
+  if (qi >= 110) return 75;
+  if (qi >= 101) return 53;
+  if (qi >= 95) return 37;
+  if (qi >= 90) return 25;
+  if (qi >= 85) return 16;
+  if (qi >= 80) return 9;
+  return Math.max(1, Math.round((qi / 80) * 8));
+}
+
 const SEGUNDOS_POR_QUESTAO = 60;
 const METADE_DO_TESTE = 50; // percentual para exibir a mensagem motivacional
 
@@ -171,6 +193,7 @@ export default function HomePage() {
   const [pagando, setPagando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [externalRef, setExternalRef] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutAprovado, setCheckoutAprovado] = useState(false);
   const [pixAberto, setPixAberto] = useState(false);
@@ -195,9 +218,52 @@ export default function HomePage() {
 
   // Estado para controle do fluxo de checkout
   const [clicouNoLink, setClicouNoLink] = useState(false);
+  const [verificandoPagamento, setVerificandoPagamento] = useState(false);
+  const [verificacaoMsg, setVerificacaoMsg] = useState<string | null>(null);
 
   // Estado para controle de cópia de e-mail
   const [copiado, setCopiado] = useState(false);
+  const [nomeCertificado, setNomeCertificado] = useState("");
+  const [gerandoCertificado, setGerandoCertificado] = useState(false);
+  const [metodoPagamento, setMetodoPagamento] = useState<"pix" | "cartao">("pix");
+  const [emailCapturaMarketing, setEmailCapturaMarketing] = useState("");
+  const [emailCapturado, setEmailCapturado] = useState(false);
+
+  // Timer de urgência 24h — salva timestamp de conclusão no localStorage
+  const [tempoRestanteResultado, setTempoRestanteResultado] = useState<number | null>(null);
+  const [resultadoExpirado, setResultadoExpirado] = useState(false);
+
+  useEffect(() => {
+    if (fase !== "resultado-pronto") return;
+
+    const DURACAO_24H = 24 * 60 * 60; // 24h em segundos
+    const STORAGE_KEY = "scoremental_resultado_ts";
+
+    let conclusaoTs = Number(localStorage.getItem(STORAGE_KEY));
+    if (!conclusaoTs || isNaN(conclusaoTs)) {
+      conclusaoTs = Math.floor(Date.now() / 1000);
+      localStorage.setItem(STORAGE_KEY, String(conclusaoTs));
+    }
+
+    const calcularRestante = () => {
+      const agora = Math.floor(Date.now() / 1000);
+      const restante = DURACAO_24H - (agora - conclusaoTs);
+      return Math.max(0, restante);
+    };
+
+    setTempoRestanteResultado(calcularRestante());
+
+    const intervalo = setInterval(() => {
+      const restante = calcularRestante();
+      setTempoRestanteResultado(restante);
+      if (restante <= 0) {
+        setResultadoExpirado(true);
+        clearInterval(intervalo);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [fase]);
 
   const handleEmailClick = () => {
     const email = "suporte.scoremental@outlook.com";
@@ -573,12 +639,14 @@ export default function HomePage() {
           acertos,
           totalPerguntas,
           qiEstimado,
+          metodo: metodoPagamento,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         url?: string;
         paymentId?: string | number;
+        externalReference?: string;
       };
       console.log("📦 Resposta API checkout:", {
         ok: res.ok,
@@ -594,19 +662,19 @@ export default function HomePage() {
       }
 
       const pid = data.paymentId != null ? String(data.paymentId) : null;
+      const eRef = data.externalReference ?? null;
       setPaymentId(pid);
+      setExternalRef(eRef);
 
       if (data.url) {
-        console.log("🔗 URL de pagamento gerada:", data.url);
-
-        // FLUXO DE CLIQUE ÚNICO: Salva a URL mas NÃO abre automaticamente para evitar bloqueio do Safari
+        console.log("🔗 URL de pagamento gerada:", data.url, "ref:", eRef);
         setPagamentoUrl(data.url);
         setPixAberto(true);
-        // O botão no formulário mudará para "ABRIR PAGAMENTO PIX"
       }
 
-      if (!pid) {
-        setErroEnvio("Falha ao iniciar o checkout. paymentId ausente.");
+      // Precisa de pelo menos um identificador para polling
+      if (!pid && !eRef) {
+        setErroEnvio("Falha ao iniciar o checkout. Identificador ausente.");
         setPagando(false);
         return;
       }
@@ -628,70 +696,97 @@ export default function HomePage() {
     };
   }, []);
 
-  // POLLING E MONITORAMENTO: Para todos quando estiver em aguardando-pagamento
-  useEffect(() => {
-    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado)
-      return;
+  // ═══ POLLING AUTOMÁTICO UNIFICADO ═══
+  // Usa paymentId (Pix direto) OU externalRef (Checkout Pro / cartão / Pix dentro do MP)
+  // Um único efeito: polling periódico (3s) + verificação ao voltar da aba
+  const pollingActiveRef = useRef(false);
 
+  const marcarAprovado = useCallback(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+    pollingActiveRef.current = false;
+    setCheckoutAprovado(true);
+    setFase("sucesso");
+    setPaymentId(null);
+    setExternalRef(null);
+    setErroEnvio(null);
+    setPixAberto(false);
+    setPagamentoUrl(null);
+    setTempoExpiracao(600);
+  }, []);
+
+  const verificarStatus = useCallback(async (pid: string | null, ref: string | null, origem: string): Promise<boolean> => {
+    try {
+      // Se tem paymentId, consulta por id; se só tem ref, consulta por ref
+      const param = pid ? `id=${encodeURIComponent(pid)}` : `ref=${encodeURIComponent(ref!)}`;
+      const res = await fetch(`/api/mercadopago/status?${param}`);
+      const data = (await res.json().catch(() => ({}))) as { status?: string };
+      console.log(`🔍 [${origem}] status=${data?.status} ${param}`);
+      if (data?.status === "approved") {
+        console.log(`✅ [${origem}] Pagamento aprovado!`);
+        marcarAprovado();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error(`🔍 [${origem}] Erro:`, err);
+      return false;
+    }
+  }, [marcarAprovado]);
+
+  useEffect(() => {
+    const hasId = !!paymentId || !!externalRef;
+    if (fase !== "aguardando-pagamento" || !hasId || checkoutAprovado) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      pollingActiveRef.current = false;
+      return;
+    }
 
     const pid = paymentId;
-    console.log("🔍 Iniciando monitoramento para paymentId:", pid);
-    pollingRef.current = setInterval(async () => {
-      try {
-        const statusRes = await fetch(
-          `/api/mercadopago/status?id=${encodeURIComponent(pid)}`,
-        );
-        const statusData = (await statusRes.json().catch(() => ({}))) as {
-          status?: string;
-          error?: string;
-        };
-        console.log("🔍 Status polling:", { pid, status: statusData?.status });
-        if (statusData?.status === "approved") {
-          console.log(
-            "✅ Pagamento aprovado! Limpando estado e mostrando sucesso",
-          );
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-          // Limpar estado e mudar para fase de sucesso
-          setCheckoutAprovado(true);
-          setFase("sucesso");
-          setPaymentId(null);
-          setErroEnvio(null);
-          setPixAberto(false);
-          setPagamentoUrl(null);
-          setTempoExpiracao(600); // Reset timer
-          return;
-        }
-      } catch (err) {
-        console.error("🔍 Erro no polling:", err);
-        return;
+    const ref = externalRef;
+    pollingActiveRef.current = true;
+    console.log("🔍 Polling automático iniciado:", { pid, ref });
+
+    // Verificação imediata ao entrar no estado
+    verificarStatus(pid, ref, "inicial");
+
+    // Polling a cada 3 segundos
+    pollingRef.current = setInterval(() => {
+      if (pollingActiveRef.current) {
+        verificarStatus(pid, ref, "polling");
       }
-    }, 1500); // Polling a cada 1.5 segundos conforme especificação
+    }, 3000);
+
+    // Verificação imediata quando o usuário volta para a aba
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && pollingActiveRef.current) {
+        verificarStatus(pid, ref, "visibilidade");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    window.addEventListener("pageshow", handleVisibility);
 
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
-        console.log("🔍 Polling limpo");
       }
+      pollingActiveRef.current = false;
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+      window.removeEventListener("pageshow", handleVisibility);
+      console.log("🔍 Polling automático limpo");
     };
-  }, [fase, paymentId, checkoutAprovado]);
+  }, [fase, paymentId, externalRef, checkoutAprovado, verificarStatus]);
 
-  useEffect(() => {
-    if (!checkoutOpen && pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-      console.log("🔍 Polling parado pelo fechamento do modal");
-    }
-  }, [checkoutOpen]);
-
-  // CRONÔMETRO DE EXPIRAÇÃO: Para todos quando estiver em aguardando-pagamento
+  // CRONÔMETRO DE EXPIRAÇÃO (10 min)
   useEffect(() => {
     if (fase !== "aguardando-pagamento" || !pixAberto || checkoutAprovado)
       return;
@@ -703,8 +798,8 @@ export default function HomePage() {
           setPixAberto(false);
           setPagamentoUrl(null);
           setErroEnvio("Tempo de pagamento expirado. Tente novamente.");
-          setFase("resultado-pronto"); // Volta para a tela de resultado
-          return 600; // Reset para 10 minutos
+          setFase("resultado-pronto");
+          return 600;
         }
         return prev - 1;
       });
@@ -713,111 +808,35 @@ export default function HomePage() {
     return () => clearInterval(intervalo);
   }, [fase, pixAberto, checkoutAprovado]);
 
-  // Formatar tempo para MM:SS
   const formatarTempo = (segundos: number) => {
     const mins = Math.floor(segundos / 60);
     const secs = segundos % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // MONITORAMENTO EM SEGUNDO PLANO: Para todos - verifica quando usuário volta da aba
-  useEffect(() => {
-    if (fase !== "aguardando-pagamento" || !paymentId || checkoutAprovado)
-      return;
-
-    // VERIFICAÇÃO IMEDIATA quando usuário volta para nossa aba
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible" && paymentId) {
-        console.log(
-          "📱 VISIBILIDADE alterada - Verificação imediata disparada",
-        );
-
-        try {
-          // Usar caminho relativo para garantir que funcione em qualquer domínio (dev ou prod)
-          const statusRes = await fetch(
-            `/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`,
-          );
-          const statusData = (await statusRes.json().catch(() => ({}))) as {
-            status?: string;
-            error?: string;
-          };
-          console.log("📱 Status na verificação imediata:", {
-            paymentId,
-            status: statusData?.status,
-          });
-
-          if (statusData?.status === "approved") {
-            console.log("✅ Pagamento aprovado na verificação imediata!");
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current);
-              pollingRef.current = null;
-            }
-            setCheckoutAprovado(true);
-            setFase("sucesso");
-            setPaymentId(null);
-            setErroEnvio(null);
-            setPixAberto(false);
-            setPagamentoUrl(null);
-            setTempoExpiracao(600);
-          }
-        } catch (err) {
-          console.error("📱 Erro na verificação imediata:", err);
-        }
-      }
-    };
-
-    // Adicionar listeners para garantir captura em todos os navegadores (especialmente Safari Mobile)
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleVisibilityChange);
-    window.addEventListener("pageshow", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleVisibilityChange);
-      window.removeEventListener("pageshow", handleVisibilityChange);
-    };
-  }, [fase, paymentId, checkoutAprovado]);
-
-  // Função de verificação manual (botão)
+  // Função de verificação manual (botão "Já paguei?" — fallback)
   const handleManualCheck = async () => {
-    if (!paymentId) return;
-
-    console.log("🔘 Verificação manual disparada pelo usuário");
-    try {
-      const statusRes = await fetch(
-        `/api/mercadopago/status?id=${encodeURIComponent(paymentId)}`,
-      );
-      const statusData = (await statusRes.json().catch(() => ({}))) as {
-        status?: string;
-        error?: string;
-      };
-      console.log("🔘 Status manual:", {
-        paymentId,
-        status: statusData?.status,
-      });
-
-      if (statusData?.status === "approved") {
-        console.log(
-          "✅ Pagamento aprovado na verificação manual! Exibindo sucesso",
-        );
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-        setCheckoutAprovado(true);
-        setFase("sucesso");
-        setPaymentId(null);
-        setErroEnvio(null);
-        setPixAberto(false);
-        setPagamentoUrl(null);
-        setTempoExpiracao(600);
-      } else {
-        // Feedback visual de que ainda não foi aprovado
-        console.log("⏳ Ainda não aprovado na verificação manual");
-      }
-    } catch (err) {
-      console.error("🔘 Erro na verificação manual:", err);
+    if (!paymentId) {
+      setVerificacaoMsg("Erro: ID de pagamento não encontrado. Tente recarregar a página.");
+      return;
     }
+
+    setVerificandoPagamento(true);
+    setVerificacaoMsg(null);
+
+    for (let i = 1; i <= 3; i++) {
+      setVerificacaoMsg(`Verificando... tentativa ${i}/3`);
+      const ok = await verificarStatus(paymentId, externalRef, `manual-${i}`);
+      if (ok) {
+        setVerificandoPagamento(false);
+        setVerificacaoMsg(null);
+        return;
+      }
+      if (i < 3) await new Promise((r) => setTimeout(r, 2000));
+    }
+
+    setVerificandoPagamento(false);
+    setVerificacaoMsg("Pagamento ainda não confirmado. A verificação automática continua rodando — aguarde ou tente novamente.");
   };
 
   return (
@@ -832,9 +851,8 @@ export default function HomePage() {
                 <div className="overflow-visible min-w-0">
                   <HeroTitleAnimated onWordHover={playShimmer} />
                   <p className="mt-2 max-w-lg text-xs text-muted md:text-sm">
-                    Um teste moderno, rápido e orientado para o mercado, com
-                    relatório detalhado e certificado em PDF enviado diretamente
-                    para o seu e-mail.
+                    Um teste moderno, rápido e 100% gratuito. Receba seu
+                    resultado na hora com certificado em PDF para download.
                   </p>
                 </div>
               </div>
@@ -948,7 +966,7 @@ export default function HomePage() {
                 </button>
               </div>
               <div className="flex w-full items-center justify-center gap-1.5 mt-3 whitespace-nowrap text-[11px] text-white/40 font-medium tracking-wide">
-  🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
+  🔒 Ambiente Seguro | ✅ 100% Gratuito | ⚡ Resultado Imediato
 </div>
             </div>
           )}
@@ -1137,104 +1155,297 @@ export default function HomePage() {
           {fase === "resultado-pronto" && (
             <Dialog.Root open={checkoutOpen} onOpenChange={setCheckoutOpen}>
               <div
-                className={`mt-4 space-y-6 transition-all duration-250 ${
+                className={`mt-4 space-y-8 transition-all duration-250 ${
                   animando
                     ? "translate-y-2 opacity-0"
                     : "translate-y-0 opacity-100"
                 }`}
               >
-                <div className="space-y-3">
-                  <span className="badge-soft">
-                    Resultado pronto • Análise concluída
+                {/* ═══ SEÇÃO 1: RESULTADO ═══ */}
+                <div className="space-y-4 text-center">
+                  <span className="badge-soft inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    Teste Concluído!
                   </span>
                   <h2 className="text-xl font-semibold text-white md:text-2xl">
-                    Seu relatório de QI profissional está pronto para envio
+                    Seu Resultado
                   </h2>
-                  <p className="max-w-xl text-xs text-muted md:text-sm">
-                    Com base nas suas respostas, geramos um{" "}
-                    <span className="font-medium text-foreground/90">
-                      relatório detalhado + certificado em PDF
-                    </span>{" "}
-                    com seu QI estimado, comparativos de desempenho e insights
-                    práticos para sua carreira.
+
+                  <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+                    <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-4 text-center">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300/70 mb-1">QI Estimado</p>
+                      <p className="text-3xl font-bold text-white">{qiEstimado}</p>
+                      <p className="text-[11px] text-cyan-300/80 mt-1">{classificacaoQI(qiEstimado)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-4 text-center">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300/70 mb-1">Percentil</p>
+                      <p className="text-3xl font-bold text-white">{percentilFromQi(qiEstimado)}º</p>
+                      <p className="text-[11px] text-indigo-300/80 mt-1">da população</p>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-muted">
+                    Pontuação: <span className="font-medium text-foreground/90">{acertos}/{totalPerguntas}</span> questões corretas
                   </p>
                 </div>
 
-                <div className="relative grid grid-cols-3 gap-1.5 text-[11px] md:gap-4 md:text-sm">
-                  <TiltCard
-                    className="min-h-[60px] md:min-h-[120px]"
-                    variant="neon-blue"
-                  >
-                    <p className="card-title-shine">O que você recebe</p>
-                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
-                      <li>• QI estimado com explicação clara</li>
-                      <li>• Perfil cognitivo profissional</li>
-                      <li>• Pontos fortes e recomendações</li>
-                    </ul>
-                  </TiltCard>
-                  <TiltCard
-                    className="min-h-[60px] md:min-h-[120px]"
-                    variant="neon-blue"
-                  >
-                    <p className="card-title-shine">Certificado em PDF</p>
-                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
-                      <li>• Assinatura digital verificada</li>
-                      <li>• Ideal para currículo e LinkedIn</li>
-                      <li>• Envio automático por e-mail</li>
-                    </ul>
-                  </TiltCard>
-                  <TiltCard
-                    className="min-h-[60px] md:min-h-[120px]"
-                    variant="neon-blue"
-                  >
-                    <p className="card-title-shine">Pagamento seguro</p>
-                    <ul className="mt-1 space-y-1 md:space-y-1.5 text-gray-400">
-                      <li>• Pagamento via Pix (prioritário) ou cartão</li>
-                      <li>
-                        • Checkout Mercado Pago com confirmação automática
-                      </li>
-                      <li>• Envio do PDF após pagamento confirmado</li>
-                    </ul>
-                  </TiltCard>
+                {/* ═══ SEÇÃO 2: CERTIFICADO GRATUITO ═══ */}
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-4">
+                  <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                    <span className="text-emerald-400">📄</span> Certificado Gratuito
+                  </h3>
+                  <p className="text-sm text-muted">
+                    Seu certificado está pronto para download. Informe seu nome para personalizar.
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      placeholder="Seu nome completo"
+                      value={nomeCertificado}
+                      onChange={(e) => setNomeCertificado(e.target.value)}
+                      className="w-full rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/20 focus:border-emerald-500/30 focus:bg-white/[0.06] focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      disabled={!nomeCertificado.trim() || gerandoCertificado}
+                      onClick={async () => {
+                        setGerandoCertificado(true);
+                        try {
+                          const params = new URLSearchParams({
+                            nome: nomeCertificado.trim(),
+                            qi: String(qiEstimado),
+                            acertos: String(acertos),
+                          });
+                          const res = await fetch(`/api/certificado-gratuito?${params}`);
+                          if (!res.ok) throw new Error("Falha ao gerar certificado");
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `certificado-qi-${nomeCertificado.trim().replace(/\s+/g, "-").toLowerCase()}.pdf`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error("Erro ao baixar certificado:", err);
+                        } finally {
+                          setGerandoCertificado(false);
+                        }
+                      }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-colors"
+                    >
+                      {gerandoCertificado ? "Gerando..." : "🔽 Baixar Certificado PDF"}
+                    </button>
+
+                    <a
+                      href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://scoremental.com.br")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0A66C2] hover:bg-[#004182] px-4 py-3 text-sm font-semibold text-white transition-colors"
+                    >
+                      Compartilhar no LinkedIn
+                    </a>
+                  </div>
                 </div>
 
-                <div className="flex flex-col items-center gap-4 text-center w-full max-w-2xl mx-auto mb-6">
-  <CertificatesCounter />
-  
-  <Dialog.Trigger asChild>
-    <button
-      type="button"
-      onClick={() => {
-        playDeepUiPulseSound();
-        if (typeof window !== "undefined" && (window as any).ttq) {
-          (window as any).ttq.track("InitiateCheckout", {
-            content_id: "teste_qi_01",
-            content_type: "product",
-            value: 6.00,
-            currency: "BRL"
-          });
-        }
-      }}
-      className="button-cta accent-ring w-full md:mx-auto md:block md:max-w-md text-base py-4"
-    >
-      Obter Relatório Completo + Certificado por apenas R$ 6,00
-    </button>
-  </Dialog.Trigger>
+                {/* ═══ CAPTURA DE E-MAIL (remarketing) ═══ */}
+                {!emailCapturado ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-3 text-center">
+                    <p className="text-sm text-white font-medium">Receba dicas de desenvolvimento cognitivo</p>
+                    <p className="text-xs text-muted">Deixe seu e-mail e receba conteúdo exclusivo sobre QI e carreira.</p>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!emailCapturaMarketing || !emailCapturaMarketing.includes("@")) return;
+                        setEmailCapturado(true);
+                        // Salva no localStorage para remarketing futuro
+                        localStorage.setItem("scoremental_email", emailCapturaMarketing);
+                      }}
+                      className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto"
+                    >
+                      <input
+                        type="email"
+                        placeholder="seuemail@exemplo.com"
+                        value={emailCapturaMarketing}
+                        onChange={(e) => setEmailCapturaMarketing(e.target.value)}
+                        className="flex-1 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-blue-500/30 focus:ring-4 focus:ring-blue-500/10"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition-colors whitespace-nowrap"
+                      >
+                        Receber dicas
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-center">
+                    <p className="text-sm text-emerald-300">✓ E-mail cadastrado! Fique de olho na sua caixa de entrada.</p>
+                  </div>
+                )}
 
-  <div className="flex flex-col items-center gap-2 w-full mt-2">
-    <p className="text-[11px] text-muted text-center max-w-[420px] mx-auto leading-relaxed">
-      O relatório completo e o certificado em PDF serão enviados
-      ao e-mail informado após a confirmação do pagamento.
-    </p>
+                {/* ═══ TIMER DE URGÊNCIA ═══ */}
+                {tempoRestanteResultado !== null && !resultadoExpirado && (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-center">
+                    <p className="text-xs text-amber-300/80">
+                      Seu resultado ficará disponível por{" "}
+                      <span className="font-mono font-bold text-amber-200">
+                        {Math.floor(tempoRestanteResultado / 3600).toString().padStart(2, "0")}:
+                        {Math.floor((tempoRestanteResultado % 3600) / 60).toString().padStart(2, "0")}:
+                        {(tempoRestanteResultado % 60).toString().padStart(2, "0")}
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-amber-400/60 mt-0.5">Após esse período, você precisará refazer o teste.</p>
+                  </div>
+                )}
+                {resultadoExpirado && (
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-center space-y-3">
+                    <p className="text-sm text-red-300 font-medium">Seu resultado expirou.</p>
+                    <button
+                      type="button"
+                      onClick={() => window.location.href = "/"}
+                      className="inline-flex items-center justify-center rounded-xl bg-red-600 hover:bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors"
+                    >
+                      Refazer o teste
+                    </button>
+                  </div>
+                )}
 
-    {/* Selos usando apenas Tailwind puro, forçando o tamanho reduzido */}
-    <div className="flex items-center justify-center text-[10px] text-gray-400 opacity-90 whitespace-nowrap gap-1.5 mt-1">
-      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
-    </div>
-  </div>
-</div>
+                {/* ═══ SEPARADOR ═══ */}
+                <div className="border-t border-white/10" />
+
+                {/* ═══ SEÇÃO 3: RELATÓRIO PREMIUM ═══ */}
+                <div className="space-y-5">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-semibold text-white">
+                      🔓 Relatório Premium — Desbloqueie sua análise completa
+                    </h3>
+                    <p className="text-sm text-muted max-w-lg mx-auto">
+                      Seu certificado mostra <span className="font-semibold text-white">O QUE</span> você alcançou.{" "}
+                      O Relatório Premium mostra <span className="font-semibold text-white">POR QUÊ</span> — e como ir além.
+                    </p>
+                  </div>
+
+                  {/* Preview borrado */}
+                  <div className="relative overflow-hidden rounded-2xl border border-white/10">
+                    <div className="p-5 space-y-3" style={{ filter: "blur(8px)", pointerEvents: "none", userSelect: "none" }}>
+                      <p className="text-sm font-semibold text-white">Dashboard de Resultados</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-32">Percepção Visual</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-cyan-500 rounded-full" style={{ width: "60%" }} />
+                          </div>
+                          <span className="text-xs text-gray-400">60%</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-32">Raciocínio Abstrato</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: "80%" }} />
+                          </div>
+                          <span className="text-xs text-gray-400">80%</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-32">Lógica Sequencial</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "72%" }} />
+                          </div>
+                          <span className="text-xs text-gray-400">72%</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-32">Memória de Trabalho</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: "55%" }} />
+                          </div>
+                          <span className="text-xs text-gray-400">55%</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-32">Processamento Verbal</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: "68%" }} />
+                          </div>
+                          <span className="text-xs text-gray-400">68%</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Curva de Gauss • Guia de Carreira • Detalhamento Q&A</p>
+                    </div>
+                    <div
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{
+                        background: "linear-gradient(to bottom, rgba(2,6,23,0) 0%, rgba(2,6,23,0.8) 100%)",
+                      }}
+                    >
+                      <span className="text-white/60 text-sm font-medium">Conteúdo exclusivo do Relatório Premium</span>
+                    </div>
+                  </div>
+
+                  {/* Lista de benefícios */}
+                  <div className="space-y-2 text-sm">
+                    <p className="text-xs uppercase tracking-[0.15em] text-white/40 font-semibold">O que está incluso:</p>
+                    <ul className="space-y-1.5 text-gray-300">
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Dashboard completo com scores por área</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Análise detalhada de 5 competências cognitivas</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Comparação populacional (Curva de Gauss)</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Guia de Carreira personalizado</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> Detalhamento questão por questão</li>
+                      <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✅</span> 12 páginas de conteúdo exclusivo</li>
+                    </ul>
+                  </div>
+
+                  {/* CTA Premium */}
+                  <div className="flex flex-col items-center gap-3">
+                    <Dialog.Trigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playDeepUiPulseSound();
+                          if (typeof window !== "undefined" && (window as any).ttq) {
+                            (window as any).ttq.track("InitiateCheckout", {
+                              content_id: "relatorio_premium_01",
+                              content_type: "product",
+                              value: 9.90,
+                              currency: "BRL"
+                            });
+                          }
+                        }}
+                        className="button-cta accent-ring w-full md:max-w-md text-base py-4"
+                      >
+                        🔓 Desbloquear Relatório Premium — R$ 9,90
+                      </button>
+                    </Dialog.Trigger>
+                    <p className="text-[11px] text-muted text-center">
+                      ⚡ Entrega imediata no seu e-mail • 🔒 Pagamento seguro via Pix
+                    </p>
+                  </div>
+                </div>
+
+                {/* ═══ SEÇÃO 4: DEPOIMENTOS ═══ */}
+                <div className="space-y-4">
+                  <h3 className="text-base font-semibold text-white text-center">💬 Depoimentos</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <p className="text-sm text-gray-300 italic">
+                        &ldquo;O relatório me ajudou a entender onde focar meu desenvolvimento profissional.&rdquo;
+                      </p>
+                      <p className="mt-2 text-xs text-muted">— Ana, SP</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <p className="text-sm text-gray-300 italic">
+                        &ldquo;Coloquei o certificado no LinkedIn e recebi 3 mensagens de recrutadores.&rdquo;
+                      </p>
+                      <p className="mt-2 text-xs text-muted">— Carlos, RJ</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              {/* ═══ MODAL DE CHECKOUT PREMIUM ═══ */}
               <Dialog.Portal>
   <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
   <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/70 bg-slate-950/95 p-6 shadow-2xl outline-none">
@@ -1242,10 +1453,10 @@ export default function HomePage() {
       <div>
         <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
           <span className="text-green-400">✓</span>
-          Checkout seguro • R$ 6,00
+          Relatório Premium • R$ 9,90
         </Dialog.Title>
         <Dialog.Description className="mt-1 text-xs text-muted">
-          Preencha seus dados para receber o relatório completo e certificado
+          Preencha seus dados para receber o relatório completo de 12 páginas
         </Dialog.Description>
       </div>
       <Dialog.Close className="text-gray-400 hover:text-white transition-colors">
@@ -1256,10 +1467,35 @@ export default function HomePage() {
     </div>
 
     <form onSubmit={handlePagamentoSimulado} className="space-y-5">
-  {/* Campo Nome com Visual Premium */}
+  {/* Toggle Pix / Cartão */}
+  <div className="flex rounded-xl border border-white/10 overflow-hidden">
+    <button
+      type="button"
+      onClick={() => setMetodoPagamento("pix")}
+      className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+        metodoPagamento === "pix"
+          ? "bg-blue-600 text-white"
+          : "bg-white/[0.03] text-white/50 hover:text-white/70"
+      }`}
+    >
+      ⚡ Pix
+    </button>
+    <button
+      type="button"
+      onClick={() => setMetodoPagamento("cartao")}
+      className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+        metodoPagamento === "cartao"
+          ? "bg-blue-600 text-white"
+          : "bg-white/[0.03] text-white/50 hover:text-white/70"
+      }`}
+    >
+      💳 Cartão
+    </button>
+  </div>
+
   <div className="space-y-1.5 group">
     <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-white/30 ml-1 transition-colors group-focus-within:text-blue-400/60">
-      Nome para o certificado
+      Nome para o relatório
     </label>
     <input
       type="text"
@@ -1271,7 +1507,6 @@ export default function HomePage() {
     />
   </div>
 
-  {/* Campo E-mail com Visual Premium */}
   <div className="space-y-1.5 group">
     <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-white/30 ml-1 transition-colors group-focus-within:text-blue-400/60">
       E-mail para envio do relatório
@@ -1286,14 +1521,13 @@ export default function HomePage() {
     />
   </div>
 
-  {/* ÁREA DOS BOTÕES (Muda dependendo se o link foi gerado ou não) */}
   {!pagamentoUrl ? (
     <button
       type="submit"
       disabled={pagando || !email || !nome}
       className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 mt-2 shadow-lg shadow-blue-500/10"
     >
-      {pagando ? "Processando..." : "Pagar R$ 6,00 e receber por e-mail"}
+      {pagando ? "Processando..." : `Pagar R$ 9,90 via ${metodoPagamento === "pix" ? "Pix" : "Cartão"}`}
     </button>
   ) : !clicouNoLink ? (
     <div className="flex flex-col items-center gap-3 mt-2">
@@ -1328,20 +1562,18 @@ export default function HomePage() {
     </div>
   )}
 
-  {/* SELO DO MERCADO PAGO (Agora fixo, nunca some!) */}
   <div className="text-center mt-4">
     <div className="inline-block bg-[#009EE3] text-white px-3 py-1 rounded font-bold text-[11px] tracking-[0.05em] uppercase shadow-sm">
       Mercado Pago
     </div>
   </div>
 
-  {/* SEUS SELOS MANTIDOS EXATAMENTE IGUAIS */}
   <div className="mt-4 flex flex-col items-center gap-1.5">
     <div className="text-center text-[9px] text-muted/50 uppercase tracking-tighter">
       Transação segura e confidencial • Dados tratados com criptografia
     </div>
     <div className="flex items-center justify-center text-[9px] text-gray-500 opacity-80 whitespace-nowrap gap-1.5">
-      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 6,00
+      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 9,90
     </div>
   </div>
 </form>
@@ -1406,10 +1638,24 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={handleManualCheck}
-                  className="button-secondary w-full justify-center text-sm py-3"
+                  disabled={verificandoPagamento}
+                  className="button-secondary w-full justify-center text-sm py-3 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Já paguei? Verificar agora
+                  {verificandoPagamento ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Verificando...
+                    </span>
+                  ) : (
+                    "Já paguei? Verificar agora"
+                  )}
                 </button>
+
+                {verificacaoMsg && (
+                  <p className="text-xs text-center text-amber-300/90 mt-1 px-2">
+                    {verificacaoMsg}
+                  </p>
+                )}
 
                 {pagamentoUrl && (
                   <button
@@ -1505,15 +1751,13 @@ export default function HomePage() {
 
                 <div className="mt-5 space-y-3">
                   <h2 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
-                    Parabéns! Seu Certificado de QI Oficial foi Gerado com
-                    Sucesso!
+                    Relatório Premium Enviado!
                   </h2>
                   <p
                     className="sucesso-text-reveal mx-auto max-w-md text-sm leading-relaxed text-muted"
                     style={{ animationDelay: "180ms" }}
                   >
-                    O seu relatório detalhado e o certificado em PDF foram
-                    enviados para{" "}
+                    Seu relatório detalhado de 12 páginas foi enviado para{" "}
                     <span className="inline-block max-w-full break-all font-semibold text-foreground">
                       {" "}
                       {email || "(e-mail não informado)"}
@@ -1530,7 +1774,7 @@ export default function HomePage() {
                     <div className="flex flex-col items-center gap-3 text-center">
                       <div className="w-full min-w-0">
                         <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
-                          Certificado Digital
+                          Relatório Premium
                         </p>
                         <p className="mt-2 w-full max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-white text-[clamp(1.05rem,4.6vw,1.4rem)]">
                           {nome || "Candidato"}
@@ -1554,10 +1798,10 @@ export default function HomePage() {
                     <div className="mt-6 grid gap-2 text-left text-xs text-muted sm:grid-cols-2">
                       <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
                         <p className="text-[10px] uppercase tracking-[0.2em] text-muted/80">
-                          Status
+                          Relatório
                         </p>
                         <p className="mt-1 text-emerald-200">
-                          Pagamento aprovado
+                          12 páginas
                         </p>
                       </div>
                       <div className="rounded-2xl border border-white/5 bg-black/10 px-3 py-2">
@@ -1583,8 +1827,8 @@ export default function HomePage() {
                     Voltar ao início
                   </button>
                   <p className="max-w-prose text-center text-[11px] text-muted/80">
-                    Obrigado por investir no seu potencial. Seu certificado já
-                    pode ser anexado ao currículo e ao LinkedIn.
+                    Seu relatório inclui análise de 5 áreas cognitivas, comparação
+                    populacional, guia de carreira e detalhamento questão por questão.
                   </p>
                 </div>
               </div>
@@ -1599,13 +1843,12 @@ export default function HomePage() {
               <div className="space-y-6">
                 <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
                   <h3 className="text-base md:text-lg font-medium text-foreground">
-                    Entrega rápida
+                    Resultado imediato e gratuito
                   </h3>
                   <p className="mt-2 text-muted text-sm md:text-base">
-                    Após a confirmação do pagamento, seu relatório detalhado e
-                    certificado em PDF serão enviados imediatamente para o
-                    e-mail cadastrado. Garantimos agilidade e segurança na
-                    entrega.
+                    Ao concluir o teste, seu QI estimado e percentil são
+                    exibidos na hora. Você também pode baixar um certificado
+                    gratuito em PDF para anexar ao currículo ou LinkedIn.
                   </p>
                 </div>
                 <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
@@ -1613,10 +1856,9 @@ export default function HomePage() {
                     Segurança dos dados
                   </h3>
                   <p className="mt-2 text-muted text-sm md:text-base">
-                    Valorizamos sua privacidade. Todos os seus dados, incluindo
-                    respostas e informações de pagamento, são tratados com
-                    criptografia e confidencialidade. Não compartilhamos suas
-                    informações com terceiros.
+                    Valorizamos sua privacidade. Todos os seus dados e respostas
+                    são tratados com criptografia e confidencialidade. Não
+                    compartilhamos suas informações com terceiros.
                   </p>
                 </div>
                 <div className="rounded-3xl border border-border/60 shadow-soft p-4 md:p-6 w-full transition-all duration-300 hover:bg-white/5 hover:border-white/20 hover:shadow-lg active:scale-[0.98]" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
@@ -1698,7 +1940,7 @@ export default function HomePage() {
                       ? "Inicie o teste para desbloquear seu relatório profissional."
                       : fase === "quiz"
                         ? "Responda às questões com calma e atenção aos detalhes."
-                        : "Finalize o checkout para receber o relatório completo por e-mail."}
+                        : "Baixe seu certificado grátis ou desbloqueie o relatório premium."}
                   </p>
                 </div>
               </div>
@@ -1706,12 +1948,12 @@ export default function HomePage() {
 
             <div className="mt-6 border-t border-border/50 pt-4 text-[11px] text-muted">
               <p>
-                Protótipo de interface para teste de QI profissional com paywall
-                elegante.
+                Teste de QI profissional gratuito com relatório premium
+                opcional.
               </p>
               <p className="mt-1 text-xs text-foreground/70">
-                Ideal para validar jornada de usuário, experiênia de pagamento e
-                percepção de valor em produtos de avaliação.
+                Resultado imediato, certificado grátis e análise detalhada
+                disponível a partir de R$ 9,90.
               </p>
             </div>
           </aside>

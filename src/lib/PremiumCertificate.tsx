@@ -1464,3 +1464,98 @@ export function createPremiumCertificateDocument(
 export function PremiumCertificate(props: PremiumCertificateProps) {
   return createPremiumCertificateDocument(props);
 }
+
+/** Gera apenas a página do certificado (1 página) — versão gratuita */
+export function createFreeCertificateDocument(
+  props: Pick<PremiumCertificateProps, "nome" | "qiFinal" | "percentil" | "dataEmissao" | "relatorioId" | "totalPerguntas">
+): React.ReactElement<DocumentProps> {
+  const percentil = clampPercentile(props.percentil);
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <Frame>
+          <View style={styles.certificateHeaderRow}>
+            <View style={{ flexDirection: "column" }}>
+              <Text style={styles.certificateKicker}>CERTIFICADO</Text>
+              <Text style={styles.certificateTitleSmall}>Teste de QI Profissional</Text>
+            </View>
+            <View style={styles.certificateStar}>
+              <Text style={styles.certificateStarText} wrap={false}>
+                ★
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.certificateMainTitle}>Certificado de Conclusão</Text>
+          <Text style={styles.certificateSubTitle}>
+            Documento oficial de desempenho cognitivo — validação por ID e autenticação digital.
+          </Text>
+
+          <View style={styles.certificateCenterStack}>
+            <View style={styles.certificateSealWrap}>
+              <View style={styles.certificateSeal}>
+                <MedalSeal size={108} />
+              </View>
+            </View>
+
+            <View style={styles.certificateNameWrap}>
+              <Text
+                style={[
+                  styles.certificateName,
+                  {
+                    fontSize: adaptiveNameFontSize(props.nome, 26, 16),
+                    marginTop: 14
+                  }
+                ]}
+                wrap={false}
+              >
+                {props.nome}
+              </Text>
+            </View>
+            <Text style={styles.certificateBody}>
+              Este certificado confirma a conclusão do Teste de QI Profissional, com análise baseada em {props.totalPerguntas} questões.
+              O resultado abaixo reflete a pontuação final apurada com rigor estatístico.
+            </Text>
+          </View>
+
+          <View style={styles.certificateGrid}>
+            <View style={styles.certificateField}>
+              <Text style={styles.certificateFieldLabel}>QI final</Text>
+              <Text style={styles.certificateFieldValue}>{props.qiFinal}</Text>
+            </View>
+            <View style={styles.certificateField}>
+              <Text style={styles.certificateFieldLabel}>Percentil</Text>
+              <Text style={styles.certificateFieldValue}>{percentil}º</Text>
+            </View>
+            <View style={styles.certificateField}>
+              <Text style={styles.certificateFieldLabel}>Data de emissão</Text>
+              <Text style={styles.certificateFieldValue}>{props.dataEmissao}</Text>
+            </View>
+          </View>
+
+          <View style={styles.certificateBottomRow}>
+            <View style={styles.certificateAuthBox}>
+              <Text style={styles.certificateFieldLabel}>ID de autenticação</Text>
+              <Text style={styles.certificateAuthValue} wrap={false}>
+                {props.relatorioId}
+              </Text>
+              <Text style={styles.certificateAuthHint}>
+                Para validação, utilize o ID acima ou a autenticação via QR Code ao lado. Este documento é exclusivo e rastreável.
+              </Text>
+            </View>
+            <View style={styles.certificateQrBox}>
+              <Text style={styles.certificateQrLabel} wrap={false}>
+                QR / AUTH
+              </Text>
+              <View style={{ marginTop: 12, alignItems: "center" }}>
+                <QrPlaceholder size={72} />
+              </View>
+            </View>
+          </View>
+        </Frame>
+        <FooterBlock pageNumber={1} totalPages={1} relatorioId={props.relatorioId} />
+      </Page>
+    </Document>
+  );
+}
