@@ -121,12 +121,51 @@ function TiltCard({
 
 function HeroTitleAnimated({ onWordHover }: { onWordHover?: () => void }) {
   return (
-    <h1
-      className="hero-title-shine overflow-visible pl-px text-2xl font-semibold tracking-tight md:text-3xl"
+    <motion.h1
+      className="overflow-visible pl-px text-2xl font-semibold tracking-tight md:text-3xl"
+      style={{
+        background: "linear-gradient(90deg, #34d399, #93c5fd, #fff, #8b5cf6, #34d399, #93c5fd, #fff, #8b5cf6, #34d399)",
+        backgroundSize: "400% 100%",
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+        color: "transparent",
+      }}
+      animate={{ backgroundPosition: ["0% 50%", "-400% 50%"] }}
+      transition={{ duration: 12, ease: "linear", repeat: Infinity }}
       onMouseEnter={() => onWordHover?.()}
     >
       {HERO_TITLE}
-    </h1>
+    </motion.h1>
+  );
+}
+
+/** Shine overlay animado para botões — mesma técnica da barra de progresso */
+function ShineOverlay() {
+  return (
+    <motion.div
+      className="absolute inset-y-0 w-[55%] pointer-events-none"
+      style={{
+        background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.24) 32%, rgba(255,255,255,0.72) 50%, rgba(255,255,255,0.22) 68%, transparent 100%)",
+        skewX: "-18deg",
+        zIndex: 0,
+      }}
+      animate={{ x: ["-140%", "280%"] }}
+      transition={{ duration: 3, ease: "easeInOut", repeat: Infinity, repeatDelay: 1 }}
+    />
+  );
+}
+
+/** Card title com animação de cor via Framer Motion */
+function CardTitle({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.p
+      className={`font-bold ${className}`}
+      animate={{ color: ["#e2e8f0", "#bfdbfe", "#7dd3fc", "#e2e8f0"] }}
+      transition={{ duration: 3, ease: "easeInOut", repeat: Infinity }}
+    >
+      {children}
+    </motion.p>
   );
 }
 
@@ -917,9 +956,9 @@ export default function HomePage() {
                   variant="neon-blue"
                   onMouseEnterSound={playCardPulsar}
                 >
-                  <p className="card-title-shine">
+                  <CardTitle>
                     Foco em contexto profissional
-                  </p>
+                  </CardTitle>
                   <p className="mt-0.5 md:mt-1 text-gray-400">
                     Questões pensadas para simular tomada de decisão, lógica e
                     precisão em ambiente corporativo.
@@ -930,7 +969,7 @@ export default function HomePage() {
                   variant="neon-blue"
                   onMouseEnterSound={playCardPulsar}
                 >
-                  <p className="card-title-shine">Relatório detalhado</p>
+                  <CardTitle>Relatório detalhado</CardTitle>
                   <p className="mt-0.5 md:mt-1 text-gray-400">
                     Perfil cognitivo, pontos fortes e oportunidades de
                     desenvolvimento enviados em PDF.
@@ -941,7 +980,7 @@ export default function HomePage() {
                   variant="neon-blue"
                   onMouseEnterSound={playCardPulsar}
                 >
-                  <p className="card-title-shine">Certificado exclusivo</p>
+                  <CardTitle>Certificado exclusivo</CardTitle>
                   <p className="mt-0.5 md:mt-1 text-gray-400">
                     Certificado digital com seu resultado para anexar ao
                     currículo ou LinkedIn.
@@ -959,7 +998,8 @@ export default function HomePage() {
                   }}
                   className="button-cta accent-ring w-full max-w-sm"
                 >
-                  Iniciar teste agora
+                  <ShineOverlay />
+                  <span className="relative z-[1]">Iniciar teste agora</span>
                 </button>
                 <button className="button-ghost text-xs">
                   Aproximadamente 12 minutos • {totalPerguntas} questões
@@ -1416,7 +1456,8 @@ export default function HomePage() {
                         }}
                         className="button-cta accent-ring w-full md:max-w-md text-sm sm:text-base py-4 whitespace-nowrap"
                       >
-                        🔓 Desbloquear Relatório Premium — R$ 9,90
+                        <ShineOverlay />
+                        <span className="relative z-[1]">🔓 Desbloquear Relatório Premium — R$ 9,90</span>
                       </button>
                     </Dialog.Trigger>
                     <p className="text-[10px] sm:text-[11px] text-muted text-center whitespace-nowrap">
@@ -1527,7 +1568,8 @@ export default function HomePage() {
       disabled={pagando || !email || !nome}
       className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 mt-2 shadow-lg shadow-blue-500/10"
     >
-      {pagando ? "Processando..." : `Pagar R$ 9,90 via ${metodoPagamento === "pix" ? "Pix" : "Cartão"}`}
+      <ShineOverlay />
+      <span className="relative z-[1]">{pagando ? "Processando..." : `Pagar R$ 9,90 via ${metodoPagamento === "pix" ? "Pix" : "Cartão"}`}</span>
     </button>
   ) : !clicouNoLink ? (
     <div className="flex flex-col items-center gap-3 mt-2">
@@ -1672,7 +1714,13 @@ export default function HomePage() {
 
           {fase === "sucesso" && (
             <div className="relative flex w-full max-w-[100vw] flex-col items-center justify-center overflow-x-hidden px-1 py-6 text-center sm:py-10">
-              <div className="sucesso-card-celebrate relative w-full max-w-xl overflow-hidden rounded-3xl border border-border/60 p-6 shadow-soft sm:p-8" style={{ backgroundColor: '#020617 !important', opacity: '1 !important' }}>
+              <motion.div
+                className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-border/60 p-6 shadow-soft sm:p-8"
+                style={{ backgroundColor: '#020617', opacity: 1 }}
+                initial={{ opacity: 0, scale: 0.86 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
+              >
                 <button
                   type="button"
                   onClick={() => setSuccessMuted((v) => !v)}
@@ -1732,17 +1780,24 @@ export default function HomePage() {
 
                 <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
 
-                <div className="sucesso-check-icon mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
+                <motion.div
+                  className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: [1.15, 1] }}
+                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                >
                   <span className="text-4xl leading-none" role="img" aria-label="Sucesso">✅</span>
-                </div>
+                </motion.div>
 
                 <div className="mt-5 space-y-3">
                   <h2 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
                     Relatório Premium Enviado!
                   </h2>
-                  <p
-                    className="sucesso-text-reveal mx-auto max-w-md text-sm leading-relaxed text-muted"
-                    style={{ animationDelay: "180ms" }}
+                  <motion.p
+                    className="mx-auto max-w-md text-sm leading-relaxed text-muted"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.18, ease: "easeOut" }}
                   >
                     Seu relatório detalhado de 12 páginas foi enviado para{" "}
                     <span className="inline-block max-w-full break-all font-semibold text-foreground">
@@ -1750,12 +1805,14 @@ export default function HomePage() {
                       {email || "(e-mail não informado)"}
                     </span>
                     .
-                  </p>
+                  </motion.p>
                 </div>
 
-                <div
-                  className="sucesso-text-reveal mt-6 w-full"
-                  style={{ animationDelay: "320ms" }}
+                <motion.div
+                  className="mt-6 w-full"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.32, ease: "easeOut" }}
                 >
                   <div className="sucesso-diploma w-full rounded-3xl px-4 py-4 sm:px-6 sm:py-6">
                     <div className="flex flex-col items-center gap-3 text-center">
@@ -1801,11 +1858,13 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div
-                  className="sucesso-text-reveal mt-7 flex flex-col items-center justify-center gap-3"
-                  style={{ animationDelay: "460ms" }}
+                <motion.div
+                  className="mt-7 flex flex-col items-center justify-center gap-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.46, ease: "easeOut" }}
                 >
                   <button
                     onClick={handleVoltarAoInicio}
@@ -1817,8 +1876,8 @@ export default function HomePage() {
                     Seu relatório inclui análise de 5 áreas cognitivas, comparação
                     populacional, guia de carreira e detalhamento questão por questão.
                   </p>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             </div>
           )}
           {/* Seção de Dúvidas Frequentes (FAQ) */}
