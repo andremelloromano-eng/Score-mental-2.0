@@ -424,7 +424,7 @@ export default function HomePage() {
   }, 0);
 
   const qiEstimado = Math.round(
-    85 + (acertos / Math.max(totalPerguntas, 1)) * 35,
+    70 + (acertos / Math.max(totalPerguntas, 1)) * 70,
   );
 
   const CertificatesCounter = () => {
