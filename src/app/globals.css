@@ -176,6 +176,20 @@ body {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
 }
 
+/* iOS Safari: impede zoom automático em inputs com font-size < 16px */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* prefers-reduced-motion: Framer Motion respeita automaticamente via useReducedMotion */
 @media (prefers-reduced-motion: reduce) {
   .sucesso-cta,

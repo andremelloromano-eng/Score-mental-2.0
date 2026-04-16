@@ -13,6 +13,7 @@ import {
   releasePaymentEmailSendLock
 } from "@/lib/mercadoPagoIdempotency";
 import { trackEvent } from "@/lib/db";
+import { percentilFromQi } from "@/lib/percentil";
 
 export const runtime = "nodejs";
 
@@ -31,32 +32,6 @@ type PaymentMetadata = {
 
 function correctAnswerToOptionId(answer: Pergunta["correctAnswer"]): string {
   return answer.toLowerCase();
-}
-
-function erf(x: number): number {
-  const sign = x >= 0 ? 1 : -1;
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-  const absX = Math.abs(x);
-  const t = 1 / (1 + p * absX);
-  const y =
-    1 -
-    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) *
-      Math.exp(-absX * absX);
-  return sign * y;
-}
-
-function normalCdf(z: number): number {
-  return 0.5 * (1 + erf(z / Math.SQRT2));
-}
-
-function percentilFromQi(qi: number): number {
-  const z = (qi - 100) / 15;
-  return Math.round(normalCdf(z) * 100);
 }
 
 function isoDatePtBr(date = new Date()): string {
@@ -210,7 +185,7 @@ async function processApprovedPayment(paymentId: string): Promise<{ sent: boolea
       return resp === correta ? acc + 1 : acc;
     }, 0);
 
-    const qiEstimado = Math.round(85 + (acertos / Math.max(totalPerguntas, 1)) * 35);
+    const qiEstimado = Math.round(70 + (acertos / Math.max(totalPerguntas, 1)) * 70);
     const percentil = percentilFromQi(qiEstimado);
 
     const doc = createPremiumCertificateDocument({

@@ -15,6 +15,7 @@ import {
   playSecureConfirmationSound,
   playSuccessChimeSound,
 } from "@/lib/purpleButtonSounds";
+import { percentilFromQi } from "@/lib/percentil";
 
 const HERO_TITLE = "Descubra seu potencial cognitivo profissional";
 
@@ -177,19 +178,7 @@ function classificacaoQI(qi: number): string {
   return "Abaixo da média";
 }
 
-function percentilFromQi(qi: number): number {
-  if (qi >= 145) return 99;
-  if (qi >= 130) return 98;
-  if (qi >= 120) return 91;
-  if (qi >= 116) return 84;
-  if (qi >= 110) return 75;
-  if (qi >= 101) return 53;
-  if (qi >= 95) return 37;
-  if (qi >= 90) return 25;
-  if (qi >= 85) return 16;
-  if (qi >= 80) return 9;
-  return Math.max(1, Math.round((qi / 80) * 8));
-}
+// percentilFromQi importado de @/lib/percentil (normalCdf — fonte da verdade)
 
 const SEGUNDOS_POR_QUESTAO = 60;
 const METADE_DO_TESTE = 50; // percentual para exibir a mensagem motivacional
@@ -279,6 +268,11 @@ export default function HomePage() {
     const DURACAO_24H = 24 * 60 * 60;
     const ts = Number(localStorage.getItem("scoremental_resultado_ts"));
     const respostasSalvas = localStorage.getItem("scoremental_respostas");
+    const premiumComprado = localStorage.getItem("scoremental_premium_purchased") === "1";
+    if (premiumComprado) {
+      setTemResultadoSalvo(false);
+      return;
+    }
     if (ts && !isNaN(ts) && respostasSalvas) {
       const agora = Math.floor(Date.now() / 1000);
       setTemResultadoSalvo((agora - ts) < DURACAO_24H);
@@ -566,6 +560,7 @@ export default function HomePage() {
       if (proximaIndex >= totalPerguntas) {
         localStorage.removeItem("scoremental_resultado_ts");
         localStorage.removeItem("scoremental_respostas");
+        localStorage.removeItem("scoremental_premium_purchased");
         setFase("resultado-pronto");
         return;
       }
@@ -585,6 +580,7 @@ export default function HomePage() {
     if (proximaIndex >= totalPerguntas) {
       localStorage.removeItem("scoremental_resultado_ts");
       localStorage.removeItem("scoremental_respostas");
+      localStorage.removeItem("scoremental_premium_purchased");
       setTimeout(() => setFase("resultado-pronto"), 260);
       return;
     }
@@ -794,6 +790,9 @@ export default function HomePage() {
     setPixAberto(false);
     setPagamentoUrl(null);
     setTempoExpiracao(600);
+    // Marca que o premium foi comprado — esconde o botão "Acessar meu resultado"
+    try { localStorage.setItem("scoremental_premium_purchased", "1"); } catch {}
+    setTemResultadoSalvo(false);
   }, []);
 
   const verificarStatus = useCallback(async (pid: string | null, ref: string | null, origem: string): Promise<boolean> => {
@@ -1057,8 +1056,14 @@ export default function HomePage() {
                       }
                       setFase("resultado-pronto");
                     }}
-                    className="w-full max-w-sm rounded-xl border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-6 py-2.5 text-sm font-medium text-white/85 transition-colors hover:text-white"
+                    style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))" }}
                   >
+                    <motion.span
+                      className="inline-block h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0"
+                      animate={{ opacity: [1, 0.5, 1], scale: [1, 1.4, 1] }}
+                      transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+                    />
                     Acessar meu resultado
                   </button>
                 )}
@@ -1336,6 +1341,19 @@ export default function HomePage() {
 
                           // Revoga o blob URL após um delay para garantir que o download inicie (especialmente mobile)
                           setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+                          // Registra evento no admin com os mesmos valores do cliente
+                          fetch("/api/admin/track", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "certificate_downloaded",
+                              name: nomeCertificado.trim(),
+                              qi: qiEstimado,
+                              percentile: percentilFromQi(qiEstimado),
+                              score: `${acertos}/${totalPerguntas}`,
+                            }),
+                          }).catch(() => {});
                         } catch (err) {
                           console.error("Erro ao baixar certificado:", err);
                         } finally {
