@@ -299,6 +299,22 @@ export default function HomePage() {
       localStorage.setItem("scoremental_respostas", JSON.stringify(respostas));
     }
 
+    // Calcula valores reais a partir das respostas do state (evita closure stale)
+    const acertosReais = perguntasTyped.reduce((acc, p) => {
+      const resp = respostas[p.id];
+      if (!resp) return acc;
+      return resp === correctAnswerToOptionId(p.correctAnswer) ? acc + 1 : acc;
+    }, 0);
+    const qiReal = Math.round(70 + (acertosReais / Math.max(totalPerguntas, 1)) * 70);
+    const percentilReal = percentilFromQi(qiReal);
+
+    // Salva valores calculados como fonte da verdade para todos os eventos futuros
+    if (isNewTest) {
+      localStorage.setItem("scoremental_resultado_qi", String(qiReal));
+      localStorage.setItem("scoremental_resultado_percentil", String(percentilReal));
+      localStorage.setItem("scoremental_resultado_score", `${acertosReais}/${totalPerguntas}`);
+    }
+
     // Registra evento de conclusão no admin (apenas testes novos)
     if (isNewTest && Object.keys(respostas).length > 0) {
       fetch("/api/admin/track", {
@@ -306,9 +322,9 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "test_completed",
-          qi: qiEstimado,
-          percentile: percentilFromQi(qiEstimado),
-          score: `${acertos}/${totalPerguntas}`,
+          qi: qiReal,
+          percentile: percentilReal,
+          score: `${acertosReais}/${totalPerguntas}`,
         }),
       }).catch(() => {});
     }
@@ -518,6 +534,18 @@ export default function HomePage() {
     setImagemFalhou(false);
   }, [indiceAtual]);
 
+  // Pré-carrega imagens das próximas 3 questões
+  useEffect(() => {
+    if (fase !== "quiz") return;
+    const proximas = perguntasTyped.slice(indiceAtual + 1, indiceAtual + 4);
+    proximas.forEach((q) => {
+      if (q.imagem) {
+        const img = new window.Image();
+        img.src = q.imagem;
+      }
+    });
+  }, [fase, indiceAtual]);
+
   useEffect(() => {
     if (fase === "resultado-pronto" && !successSoundPlayedRef.current) {
       successSoundPlayedRef.current = true;
@@ -561,6 +589,9 @@ export default function HomePage() {
         localStorage.removeItem("scoremental_resultado_ts");
         localStorage.removeItem("scoremental_respostas");
         localStorage.removeItem("scoremental_premium_purchased");
+        localStorage.removeItem("scoremental_resultado_qi");
+        localStorage.removeItem("scoremental_resultado_percentil");
+        localStorage.removeItem("scoremental_resultado_score");
         setFase("resultado-pronto");
         return;
       }
@@ -581,6 +612,9 @@ export default function HomePage() {
       localStorage.removeItem("scoremental_resultado_ts");
       localStorage.removeItem("scoremental_respostas");
       localStorage.removeItem("scoremental_premium_purchased");
+      localStorage.removeItem("scoremental_resultado_qi");
+      localStorage.removeItem("scoremental_resultado_percentil");
+      localStorage.removeItem("scoremental_resultado_score");
       setTimeout(() => setFase("resultado-pronto"), 260);
       return;
     }
@@ -1152,6 +1186,7 @@ export default function HomePage() {
                       </div>
                     ) : (
                       <img
+                        key={`img-q${perguntaAtual.id}`}
                         src={perguntaAtual.imagem}
                         alt="Imagem referente à questão — analise e escolha a opção correta."
                         className="max-h-[420px] w-full object-contain object-center"
@@ -1342,16 +1377,16 @@ export default function HomePage() {
                           // Revoga o blob URL após um delay para garantir que o download inicie (especialmente mobile)
                           setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-                          // Registra evento no admin com os mesmos valores do cliente
+                          // Registra evento no admin — lê valores salvos no localStorage (fonte da verdade)
                           fetch("/api/admin/track", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               action: "certificate_downloaded",
                               name: nomeCertificado.trim(),
-                              qi: qiEstimado,
-                              percentile: percentilFromQi(qiEstimado),
-                              score: `${acertos}/${totalPerguntas}`,
+                              qi: Number(localStorage.getItem("scoremental_resultado_qi")) || qiEstimado,
+                              percentile: Number(localStorage.getItem("scoremental_resultado_percentil")) || percentilFromQi(qiEstimado),
+                              score: localStorage.getItem("scoremental_resultado_score") || `${acertos}/${totalPerguntas}`,
                             }),
                           }).catch(() => {});
                         } catch (err) {
