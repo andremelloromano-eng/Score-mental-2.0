@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createFreeCertificateDocument } from "@/lib/PremiumCertificate";
+import { trackEvent } from "@/lib/db";
 
 function erf(x: number): number {
   const sign = x >= 0 ? 1 : -1;
@@ -64,6 +65,15 @@ export async function GET(request: Request) {
 
     const pdfBuffer = await renderToBuffer(doc);
     const pdfBytes = new Uint8Array(pdfBuffer);
+
+    // Registra evento no admin dashboard
+    trackEvent({
+      action: "certificate_downloaded",
+      name: nome !== "Candidato" ? nome : null,
+      qi,
+      percentile: percentil,
+      score: `${acertos}/${totalPerguntas}`,
+    }).catch(() => {});
 
     return new NextResponse(pdfBytes, {
       headers: {

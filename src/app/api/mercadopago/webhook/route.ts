@@ -12,6 +12,7 @@ import {
   isPaymentProcessed,
   releasePaymentEmailSendLock
 } from "@/lib/mercadoPagoIdempotency";
+import { trackEvent } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -271,6 +272,20 @@ async function processApprovedPayment(paymentId: string): Promise<{ sent: boolea
     }
 
     console.log(`[webhook] ✅ Relatório enviado com sucesso. Resend id: ${data?.id}, pagamento: ${paymentId}`);
+
+    // Registra evento de compra no admin dashboard
+    const transactionAmount = (mpPayment as unknown as { transaction_amount?: number }).transaction_amount;
+    trackEvent({
+      action: "premium_purchased",
+      name: nome,
+      email,
+      qi: qiEstimado,
+      percentile: percentil,
+      score: `${acertos}/${totalPerguntas}`,
+      payment_status: "approved",
+      amount: transactionAmount ?? null,
+    }).catch((err) => console.error("[webhook] Erro ao registrar evento admin:", err));
+
     return { sent: true };
   } finally {
     await releasePaymentEmailSendLock(paymentId);

@@ -272,6 +272,21 @@ export default function HomePage() {
   const [tempoRestanteResultado, setTempoRestanteResultado] = useState<number | null>(null);
   const [resultadoExpirado, setResultadoExpirado] = useState(false);
 
+  // Verifica se existe resultado salvo válido (dentro de 24h) para o botão da landing
+  const [temResultadoSalvo, setTemResultadoSalvo] = useState(false);
+
+  useEffect(() => {
+    const DURACAO_24H = 24 * 60 * 60;
+    const ts = Number(localStorage.getItem("scoremental_resultado_ts"));
+    const respostasSalvas = localStorage.getItem("scoremental_respostas");
+    if (ts && !isNaN(ts) && respostasSalvas) {
+      const agora = Math.floor(Date.now() / 1000);
+      setTemResultadoSalvo((agora - ts) < DURACAO_24H);
+    } else {
+      setTemResultadoSalvo(false);
+    }
+  }, [fase]);
+
   useEffect(() => {
     if (fase !== "resultado-pronto") return;
 
@@ -279,9 +294,29 @@ export default function HomePage() {
     const STORAGE_KEY = "scoremental_resultado_ts";
 
     let conclusaoTs = Number(localStorage.getItem(STORAGE_KEY));
-    if (!conclusaoTs || isNaN(conclusaoTs)) {
+    const isNewTest = !conclusaoTs || isNaN(conclusaoTs);
+    if (isNewTest) {
       conclusaoTs = Math.floor(Date.now() / 1000);
       localStorage.setItem(STORAGE_KEY, String(conclusaoTs));
+    }
+
+    // Salva respostas para permitir acesso posterior dentro das 24h
+    if (Object.keys(respostas).length > 0) {
+      localStorage.setItem("scoremental_respostas", JSON.stringify(respostas));
+    }
+
+    // Registra evento de conclusão no admin (apenas testes novos)
+    if (isNewTest && Object.keys(respostas).length > 0) {
+      fetch("/api/admin/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_completed",
+          qi: qiEstimado,
+          percentile: percentilFromQi(qiEstimado),
+          score: `${acertos}/${totalPerguntas}`,
+        }),
+      }).catch(() => {});
     }
 
     const calcularRestante = () => {
@@ -302,6 +337,7 @@ export default function HomePage() {
     }, 1000);
 
     return () => clearInterval(intervalo);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
   const handleEmailClick = () => {
@@ -528,6 +564,8 @@ export default function HomePage() {
     (proximaIndex: number) => {
       setTempoRestante(SEGUNDOS_POR_QUESTAO);
       if (proximaIndex >= totalPerguntas) {
+        localStorage.removeItem("scoremental_resultado_ts");
+        localStorage.removeItem("scoremental_respostas");
         setFase("resultado-pronto");
         return;
       }
@@ -545,6 +583,8 @@ export default function HomePage() {
     }
     setAnimando(true);
     if (proximaIndex >= totalPerguntas) {
+      localStorage.removeItem("scoremental_resultado_ts");
+      localStorage.removeItem("scoremental_respostas");
       setTimeout(() => setFase("resultado-pronto"), 260);
       return;
     }
@@ -1004,6 +1044,24 @@ export default function HomePage() {
                 <button className="button-ghost text-xs">
                   Aproximadamente 12 minutos • {totalPerguntas} questões
                 </button>
+                {temResultadoSalvo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const salvas = localStorage.getItem("scoremental_respostas");
+                      if (salvas) {
+                        try {
+                          const parsed = JSON.parse(salvas);
+                          setRespostas(parsed);
+                        } catch { /* ignora JSON inválido */ }
+                      }
+                      setFase("resultado-pronto");
+                    }}
+                    className="w-full max-w-sm rounded-xl border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    Acessar meu resultado
+                  </button>
+                )}
               </div>
               <div className="flex w-full items-center justify-center gap-1.5 mt-3 whitespace-nowrap text-[11px] text-white/40 font-medium tracking-wide">
   🔒 Ambiente Seguro | ✅ 100% Gratuito | ⚡ Resultado Imediato
@@ -1264,13 +1322,20 @@ export default function HomePage() {
                           if (!res.ok) throw new Error("Falha ao gerar certificado");
                           const blob = await res.blob();
                           const url = URL.createObjectURL(blob);
+                          const fileName = `certificado-qi-${nomeCertificado.trim().replace(/\s+/g, "-").toLowerCase()}.pdf`;
+
+                          // Tenta forçar download via link com target="_blank"
                           const a = document.createElement("a");
                           a.href = url;
-                          a.download = `certificado-qi-${nomeCertificado.trim().replace(/\s+/g, "-").toLowerCase()}.pdf`;
+                          a.download = fileName;
+                          a.target = "_blank";
+                          a.rel = "noopener noreferrer";
                           document.body.appendChild(a);
                           a.click();
                           document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
+
+                          // Revoga o blob URL após um delay para garantir que o download inicie (especialmente mobile)
+                          setTimeout(() => URL.revokeObjectURL(url), 5000);
                         } catch (err) {
                           console.error("Erro ao baixar certificado:", err);
                         } finally {
@@ -1358,10 +1423,10 @@ export default function HomePage() {
                 )}
 
                 {/* ═══ SEPARADOR ═══ */}
-                <div className="border-t border-white/10" />
+                {!resultadoExpirado && <div className="border-t border-white/10" />}
 
                 {/* ═══ SEÇÃO 3: RELATÓRIO PREMIUM ═══ */}
-                <div className="space-y-5">
+                {!resultadoExpirado && <div className="space-y-5">
                   <div className="text-center space-y-2">
                     <h3 className="text-lg font-semibold text-white">
                       🔓 Relatório Premium — Desbloqueie sua análise completa
@@ -1464,7 +1529,7 @@ export default function HomePage() {
                       ⚡ Entrega imediata no e-mail • 🔒 Pagamento seguro via Pix
                     </p>
                   </div>
-                </div>
+                </div>}
 
                 {/* ═══ SEÇÃO 4: DEPOIMENTOS ═══ */}
                 <div className="space-y-4">
