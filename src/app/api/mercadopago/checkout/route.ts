@@ -9,7 +9,25 @@ type Payload = {
   totalPerguntas?: number;
   qiEstimado?: number;
   metodo?: "pix" | "cartao";
+  resultadoTs?: number | null;
 };
+
+// Oferta de lançamento: R$4,90 dentro da janela de 24h desde a conclusão do teste,
+// R$9,90 caso contrário. O timestamp é validado no servidor para evitar tampering.
+const PRICE_PROMO = 4.9;
+const PRICE_REGULAR = 9.9;
+const OFFER_WINDOW_SECONDS = 24 * 60 * 60;
+
+function resolveTransactionAmount(resultadoTs: unknown): number {
+  if (typeof resultadoTs !== "number" || !Number.isFinite(resultadoTs)) {
+    return PRICE_REGULAR;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  // Timestamp no futuro ou absurdamente antigo => inválido, cobra preço regular.
+  if (resultadoTs > nowSeconds || resultadoTs <= 0) return PRICE_REGULAR;
+  const elapsed = nowSeconds - resultadoTs;
+  return elapsed < OFFER_WINDOW_SECONDS ? PRICE_PROMO : PRICE_REGULAR;
+}
 
 type PendingCheckoutPayload = Required<Pick<Payload, "email" | "nome">> &
   Pick<Payload, "respostas" | "acertos" | "totalPerguntas" | "qiEstimado"> & {
@@ -158,7 +176,7 @@ export async function POST(request: Request) {
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     const mpClient = getMpClient();
-    const transactionAmount = 9.90;
+    const transactionAmount = resolveTransactionAmount(body.resultadoTs);
     const metodo = body.metodo === "cartao" ? "cartao" : "pix";
 
     if (metodo === "cartao") {

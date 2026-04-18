@@ -3,7 +3,7 @@
 import "@/app/globals.css";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Progress from "@radix-ui/react-progress";
 import perguntas from "@/data/perguntas.json";
@@ -16,6 +16,7 @@ import {
   playSuccessChimeSound,
 } from "@/lib/purpleButtonSounds";
 import { percentilFromQi } from "@/lib/percentil";
+import CTAFlutuante from "@/components/CTAFlutuante";
 
 const HERO_TITLE = "Descubra seu potencial cognitivo profissional";
 
@@ -170,6 +171,112 @@ function CardTitle({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
+/** Screenshots reais das páginas do Relatório Premium (renderizados com blur leve no carrossel) */
+const PREMIUM_PAGES: Array<{ src: string; alt: string }> = [
+  { src: "/images/relatorio-premium/01-dashboard.png", alt: "Dashboard de Resultados" },
+  { src: "/images/relatorio-premium/02-reconhecimento-padroes.png", alt: "Análise — Reconhecimento de Padrões" },
+  { src: "/images/relatorio-premium/03-guia-carreira.png", alt: "Guia de Carreira" },
+  { src: "/images/relatorio-premium/04-curva-gauss.png", alt: "Comparação Populacional — Curva de Gauss" },
+  { src: "/images/relatorio-premium/05-detalhamento-tecnico.png", alt: "Detalhamento Técnico das 23 Questões" },
+  { src: "/images/relatorio-premium/06-raciocinio-abstrato.png", alt: "Análise — Raciocínio Abstrato" },
+];
+
+
+/** Carrossel animado com preview das páginas reais do relatório premium */
+function PremiumPreviewCarousel() {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const total = PREMIUM_PAGES.length;
+
+  useEffect(() => {
+    if (paused) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % total);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [paused, total]);
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+    const threshold = 50;
+    if (info.offset.x < -threshold || info.velocity.x < -300) {
+      setIndex((i) => (i + 1) % total);
+    } else if (info.offset.x > threshold || info.velocity.x > 300) {
+      setIndex((i) => (i - 1 + total) % total);
+    }
+  };
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={() => setPaused(true)}
+      onTouchEnd={() => setPaused(false)}
+    >
+      <div className="relative h-72 sm:h-80">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={index}
+            className="absolute inset-0"
+            style={{ pointerEvents: "none", userSelect: "none", WebkitUserSelect: "none" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={PREMIUM_PAGES[index].src}
+              alt={PREMIUM_PAGES[index].alt}
+              className="h-full w-full object-cover object-top"
+              style={{ filter: "blur(4px)", WebkitFilter: "blur(4px)" }}
+              draggable={false}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Camada transparente para capturar swipe no mobile (sobre o conteúdo borrado) */}
+        <motion.div
+          className="absolute inset-0 z-10"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.15}
+          onDragEnd={handleDragEnd}
+          style={{ touchAction: "pan-y" }}
+        />
+
+        {/* Overlay gradient + texto */}
+        <div
+          className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center pb-10"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgba(2,6,23,0) 0%, rgba(2,6,23,0.15) 45%, rgba(2,6,23,0.88) 100%)",
+          }}
+        >
+          <span className="text-white/80 text-xs sm:text-sm font-medium px-4 text-center">
+            Conteúdo exclusivo do Relatório Premium
+          </span>
+        </div>
+      </div>
+
+      {/* Indicadores (bolinhas) */}
+      <div className="absolute bottom-2.5 left-0 right-0 z-30 flex justify-center gap-1.5">
+        {PREMIUM_PAGES.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            aria-label={`Ir para página ${i + 1}`}
+            onClick={() => setIndex(i)}
+            className={`h-1.5 rounded-full transition-all ${
+              i === index ? "w-5 bg-white/80" : "w-1.5 bg-white/30 hover:bg-white/50"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function classificacaoQI(qi: number): string {
   if (qi > 130) return "Excepcional";
   if (qi >= 116) return "Excelente";
@@ -263,12 +370,14 @@ export default function HomePage() {
 
   // Verifica se existe resultado salvo válido (dentro de 24h) para o botão da landing
   const [temResultadoSalvo, setTemResultadoSalvo] = useState(false);
+  const [premiumJaComprado, setPremiumJaComprado] = useState(false);
 
   useEffect(() => {
     const DURACAO_24H = 24 * 60 * 60;
     const ts = Number(localStorage.getItem("scoremental_resultado_ts"));
     const respostasSalvas = localStorage.getItem("scoremental_respostas");
     const premiumComprado = localStorage.getItem("scoremental_premium_purchased") === "1";
+    setPremiumJaComprado(premiumComprado);
     if (premiumComprado) {
       setTemResultadoSalvo(false);
       return;
@@ -349,6 +458,26 @@ export default function HomePage() {
     return () => clearInterval(intervalo);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
+
+  // ═══ OFERTA DE LANÇAMENTO (R$4,90 durante a janela de 24h) ═══
+  // Trata `null` como ativa para evitar flash inicial; quando expira, vira false.
+  // Também desativa se o premium já foi comprado (defesa contra caminhos imprevistos).
+  const ofertaAtiva =
+    !premiumJaComprado &&
+    !resultadoExpirado &&
+    (tempoRestanteResultado === null || tempoRestanteResultado > 0);
+  const precoAtualNumero = ofertaAtiva ? 4.9 : 9.9;
+  const precoAtualBR = ofertaAtiva ? "4,90" : "9,90";
+
+  // Vagas restantes: começa em 37 (=100-63), decresce até 0 ao longo das 24h.
+  // vagas_preenchidas = 63 + floor((tempo_passado_h / 24) * 37)
+  const vagasRestantes = (() => {
+    if (!ofertaAtiva) return 0;
+    const restanteSeg = tempoRestanteResultado ?? 24 * 60 * 60;
+    const passadoSeg = 24 * 60 * 60 - restanteSeg;
+    const preenchidas = 63 + Math.floor((passadoSeg / (24 * 60 * 60)) * 37);
+    return Math.max(0, Math.min(37, 100 - preenchidas));
+  })();
 
   const handleEmailClick = () => {
     const email = "suporte.scoremental@outlook.com";
@@ -749,6 +878,7 @@ export default function HomePage() {
           totalPerguntas,
           qiEstimado,
           metodo: metodoPagamento,
+          resultadoTs: Number(localStorage.getItem("scoremental_resultado_ts")) || null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -827,6 +957,7 @@ export default function HomePage() {
     // Marca que o premium foi comprado — esconde o botão "Acessar meu resultado"
     try { localStorage.setItem("scoremental_premium_purchased", "1"); } catch {}
     setTemResultadoSalvo(false);
+    setPremiumJaComprado(true);
   }, []);
 
   const verificarStatus = useCallback(async (pid: string | null, ref: string | null, origem: string): Promise<boolean> => {
@@ -1479,7 +1610,7 @@ export default function HomePage() {
                 {!resultadoExpirado && <div className="border-t border-white/10" />}
 
                 {/* ═══ SEÇÃO 3: RELATÓRIO PREMIUM ═══ */}
-                {!resultadoExpirado && <div className="space-y-5">
+                {!resultadoExpirado && <div id="relatorio-premium" className="space-y-5">
                   <div className="text-center space-y-2">
                     <h3 className="text-lg font-semibold text-white">
                       🔓 Relatório Premium — Desbloqueie sua análise completa
@@ -1490,58 +1621,8 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  {/* Preview borrado */}
-                  <div className="relative overflow-hidden rounded-2xl border border-white/10">
-                    <div className="p-5 space-y-3" style={{ filter: "blur(8px)", pointerEvents: "none", userSelect: "none" }}>
-                      <p className="text-sm font-semibold text-white">Dashboard de Resultados</p>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-32">Percepção Visual</span>
-                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-cyan-500 rounded-full" style={{ width: "60%" }} />
-                          </div>
-                          <span className="text-xs text-gray-400">60%</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-32">Raciocínio Abstrato</span>
-                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: "80%" }} />
-                          </div>
-                          <span className="text-xs text-gray-400">80%</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-32">Lógica Sequencial</span>
-                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "72%" }} />
-                          </div>
-                          <span className="text-xs text-gray-400">72%</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-32">Memória de Trabalho</span>
-                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500 rounded-full" style={{ width: "55%" }} />
-                          </div>
-                          <span className="text-xs text-gray-400">55%</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-32">Processamento Verbal</span>
-                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-rose-500 rounded-full" style={{ width: "68%" }} />
-                          </div>
-                          <span className="text-xs text-gray-400">68%</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">Curva de Gauss • Guia de Carreira • Detalhamento Q&A</p>
-                    </div>
-                    <div
-                      className="absolute inset-0 flex items-center justify-center"
-                      style={{
-                        background: "linear-gradient(to bottom, rgba(2,6,23,0) 0%, rgba(2,6,23,0.8) 100%)",
-                      }}
-                    >
-                      <span className="text-white/60 text-sm font-medium">Conteúdo exclusivo do Relatório Premium</span>
-                    </div>
-                  </div>
+                  {/* Preview animado das 12 páginas (carrossel automático com blur) */}
+                  <PremiumPreviewCarousel />
 
                   {/* Lista de benefícios */}
                   <div className="space-y-2 text-sm">
@@ -1556,6 +1637,109 @@ export default function HomePage() {
                     </ul>
                   </div>
 
+                  {/* ═══ CARD DE OFERTA DE LANÇAMENTO (some após 24h) ═══ */}
+                  {ofertaAtiva && (
+                    // ANIMAÇÃO 5 — entrada (fade in + slide up)
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                    >
+                      {/* ANIMAÇÃO 2 — pulso de borda dourada + leve respiração (efeito "vivo") */}
+                      <motion.div
+                        className="rounded-2xl border border-orange-500/30 bg-gradient-to-br from-orange-500/10 via-rose-500/5 to-transparent p-4 sm:p-5 space-y-3"
+                        animate={{
+                          boxShadow: [
+                            "0 0 0px rgba(234, 179, 8, 0)",
+                            "0 0 25px rgba(234, 179, 8, 0.5)",
+                          ],
+                          scale: [1, 1.015],
+                        }}
+                        transition={{
+                          duration: 2,
+                          ease: "easeInOut",
+                          repeat: Infinity,
+                          repeatType: "reverse",
+                        }}
+                      >
+                        <div className="flex items-center justify-center gap-2.5">
+                          {/* ANIMAÇÃO 3 — ponto verde pulsando (FORA do badge) */}
+                          <motion.span
+                            className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: "#10b981" }}
+                            animate={{ opacity: [1, 0.5, 1], scale: [1, 1.4, 1] }}
+                            transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+                          />
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/40 bg-orange-500/15 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-orange-200">
+                            🔥 Oferta de Lançamento
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-center gap-2 sm:gap-3">
+                          <span className="text-sm sm:text-base text-gray-400 line-through">De R$9,90</span>
+                          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400">Por R$4,90</span>
+                        </div>
+                        <p className="text-center text-xs sm:text-sm text-white/70">
+                          Primeiros 100 relatórios • Depois volta para <span className="font-semibold text-white/85">R$9,90</span>
+                        </p>
+                        {/* ═══ Contador de vagas (Melhoria 2) ═══ */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                            <motion.div
+                              className={`relative h-full overflow-hidden rounded-full ${
+                                vagasRestantes > 30
+                                  ? "bg-emerald-500"
+                                  : vagasRestantes >= 10
+                                  ? "bg-amber-400"
+                                  : "bg-red-500"
+                              }`}
+                              initial={false}
+                              animate={{ width: `${100 - vagasRestantes}%` }}
+                              transition={{ duration: 0.6, ease: "easeOut" }}
+                            >
+                              {/* ANIMAÇÃO 1 — shine sutil deslizando dentro da barra */}
+                              <motion.div
+                                className="absolute inset-y-0 w-1/3 pointer-events-none"
+                                style={{
+                                  background:
+                                    "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+                                }}
+                                animate={{ x: ["-100%", "350%"] }}
+                                transition={{
+                                  duration: 2.2,
+                                  ease: "easeInOut",
+                                  repeat: Infinity,
+                                  repeatDelay: 0.4,
+                                }}
+                              />
+                            </motion.div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                            <span className="text-white/55">{100 - vagasRestantes}/100 preenchidas</span>
+                            {/* ANIMAÇÃO 4 — destaque ao trocar o número de vagas */}
+                            <AnimatePresence mode="wait" initial={false}>
+                              <motion.span
+                                key={vagasRestantes}
+                                className={`font-semibold ${
+                                  vagasRestantes > 30
+                                    ? "text-emerald-300"
+                                    : vagasRestantes >= 10
+                                    ? "text-amber-300"
+                                    : "text-red-300"
+                                }`}
+                                initial={{ scale: 1 }}
+                                animate={{ scale: [1, 1.2, 1] }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                              >
+                                {vagasRestantes} restantes
+                              </motion.span>
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+
                   {/* CTA Premium */}
                   <div className="flex flex-col items-center gap-3">
                     <Dialog.Trigger asChild>
@@ -1567,7 +1751,7 @@ export default function HomePage() {
                             (window as any).ttq.track("InitiateCheckout", {
                               content_id: "relatorio_premium_01",
                               content_type: "product",
-                              value: 9.90,
+                              value: precoAtualNumero,
                               currency: "BRL"
                             });
                           }
@@ -1575,7 +1759,7 @@ export default function HomePage() {
                         className="button-cta accent-ring w-full md:max-w-md text-sm sm:text-base py-4 whitespace-nowrap"
                       >
                         <ShineOverlay />
-                        <span className="relative z-[1]">🔓 Desbloquear Relatório Premium — R$ 9,90</span>
+                        <span className="relative z-[1]">🔓 Desbloquear Relatório Premium — R$ {precoAtualBR}</span>
                       </button>
                     </Dialog.Trigger>
                     <p className="text-[10px] sm:text-[11px] text-muted text-center whitespace-nowrap">
@@ -1612,7 +1796,7 @@ export default function HomePage() {
       <div>
         <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
           <span className="text-green-400">✓</span>
-          Relatório Premium • R$ 9,90
+          Relatório Premium • R$ {precoAtualBR}
         </Dialog.Title>
         <Dialog.Description className="mt-1 text-xs text-muted">
           Preencha seus dados para receber o relatório completo de 12 páginas
@@ -1687,7 +1871,7 @@ export default function HomePage() {
       className="button-cta w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 mt-2 shadow-lg shadow-blue-500/10"
     >
       <ShineOverlay />
-      <span className="relative z-[1]">{pagando ? "Processando..." : `Pagar R$ 9,90 via ${metodoPagamento === "pix" ? "Pix" : "Cartão"}`}</span>
+      <span className="relative z-[1]">{pagando ? "Processando..." : `Pagar R$ ${precoAtualBR} via ${metodoPagamento === "pix" ? "Pix" : "Cartão"}`}</span>
     </button>
   ) : !clicouNoLink ? (
     <div className="flex flex-col items-center gap-3 mt-2">
@@ -1734,7 +1918,7 @@ export default function HomePage() {
       Transação segura e confidencial • Dados tratados com criptografia
     </div>
     <div className="flex items-center justify-center text-[9px] text-gray-500 opacity-80 whitespace-nowrap gap-1.5">
-      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix R$ 9,90
+      🔒 Ambiente Seguro | ✅ Entrega Garantida | ⚡ Pix
     </div>
   </div>
 </form>
@@ -2131,12 +2315,13 @@ export default function HomePage() {
               </p>
               <p className="mt-1 text-xs text-foreground/70">
                 Resultado imediato, certificado grátis e análise detalhada
-                disponível a partir de R$ 9,90.
+                disponível.
               </p>
             </div>
           </aside>
         )}
       </div>
+      {fase === "resultado-pronto" && !resultadoExpirado && <CTAFlutuante />}
     </main>
   );
 }
