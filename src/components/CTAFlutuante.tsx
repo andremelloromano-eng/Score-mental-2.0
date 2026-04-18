@@ -62,8 +62,10 @@ export default function CTAFlutuante({
           style={{
             position: "fixed",
             bottom: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
+            left: 0,
+            right: 0,
+            marginLeft: "auto",
+            marginRight: "auto",
             zIndex: 9999,
             width: "calc(100% - 32px)",
             maxWidth: 420,
