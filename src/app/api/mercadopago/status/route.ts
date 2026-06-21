@@ -238,7 +238,7 @@ async function handleApprovedPayment(
       name: pending.nome,
       email: pending.email,
       qi: qiEstimado,
-      percentile,
+      percentile: percentil,
       score: `${acertos}/${totalPerguntas}`,
       payment_status: "approved",
       amount: typeof transactionAmount === "number" ? transactionAmount : null,
