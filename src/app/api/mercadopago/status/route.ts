@@ -11,6 +11,7 @@ import {
   isPaymentProcessed,
   releasePaymentEmailSendLock
 } from "@/lib/mercadoPagoIdempotency";
+import { trackEvent } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -95,7 +96,8 @@ function isoDatePtBr(date = new Date()): string {
 async function handleApprovedPayment(
   paymentId: string,
   metadata: PaymentMetadata | undefined,
-  extRef?: string
+  extRef?: string,
+  transactionAmount?: number | null
 ): Promise<NextResponse> {
   const alreadyDone = await isPaymentProcessed(paymentId);
   if (alreadyDone) {
@@ -231,6 +233,17 @@ async function handleApprovedPayment(
     if (extRef) store.delete(extRef);
     try { await acquirePaymentDeliveryOnce(paymentId); } catch {}
 
+    trackEvent({
+      action: "premium_purchased",
+      name: pending.nome,
+      email: pending.email,
+      qi: qiEstimado,
+      percentile,
+      score: `${acertos}/${totalPerguntas}`,
+      payment_status: "approved",
+      amount: typeof transactionAmount === "number" ? transactionAmount : null,
+    }).catch((err) => console.error("[status/handleApproved] Erro ao registrar evento admin:", err));
+
     console.log(`[status/handleApproved] ✅ E-mail enviado. Resend id: ${data?.id}, payment: ${paymentId}`);
     return NextResponse.json({ id: paymentId, status: "approved", externalReference: extRef, delivered: true });
   } finally {
@@ -247,6 +260,7 @@ async function findApprovedPaymentByRef(ref: string): Promise<{
   status: string;
   metadata: PaymentMetadata | undefined;
   externalReference: string;
+  transactionAmount: number | null;
 } | null> {
   const mpClient = getMpClient();
   const payment = new Payment(mpClient);
@@ -272,6 +286,7 @@ async function findApprovedPaymentByRef(ref: string): Promise<{
           status: "approved",
           metadata: p.metadata as PaymentMetadata | undefined,
           externalReference: ref,
+          transactionAmount: typeof p.transaction_amount === "number" ? p.transaction_amount : null,
         };
       }
     }
@@ -283,6 +298,7 @@ async function findApprovedPaymentByRef(ref: string): Promise<{
       status: String(latest.status ?? "pending"),
       metadata: latest.metadata as PaymentMetadata | undefined,
       externalReference: ref,
+      transactionAmount: typeof latest.transaction_amount === "number" ? latest.transaction_amount : null,
     };
   } catch (err) {
     console.error("[mercadopago/status] erro no search por ref:", err);
@@ -322,7 +338,7 @@ export async function GET(request: Request) {
       }
 
       // Delegar para a lógica de envio com o paymentId real encontrado
-      return await handleApprovedPayment(found.id, found.metadata, refParam);
+      return await handleApprovedPayment(found.id, found.metadata, refParam, found.transactionAmount);
     }
 
     // ── ROTA 2: Busca por paymentId direto (fluxo Pix direto) ──
@@ -351,7 +367,13 @@ export async function GET(request: Request) {
     console.log("[mercadopago/status] consultado", { id, status, externalReference });
 
     if (status === "approved") {
-      return await handleApprovedPayment(id, metadata, typeof externalReference === "string" ? externalReference : undefined);
+      const transactionAmount = (mpPayment as unknown as { transaction_amount?: number }).transaction_amount;
+      return await handleApprovedPayment(
+        id,
+        metadata,
+        typeof externalReference === "string" ? externalReference : undefined,
+        typeof transactionAmount === "number" ? transactionAmount : null
+      );
     }
 
     return NextResponse.json({ id, status, externalReference });
